@@ -5,7 +5,7 @@ This project contains a Java/Swing viewer for the black-white cycle puzzle.
 ## Build
 
 ```bash
-javac -d out $(find src/main/java -name '*.java')
+javac -d out $(find src/puzzle -name '*.java')
 ```
 
 ## Run UI
@@ -32,7 +32,7 @@ Run this on Windows with JDK 21 or newer installed and available on `PATH`:
 scripts\package-windows.bat
 ```
 
-The script builds the app and creates a Windows app image at:
+The script can be double-clicked from Windows Explorer. It prints each build step, pauses before closing, and creates a Windows app image at:
 
 ```text
 dist\windows\Puzzle\Puzzle.exe
