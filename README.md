@@ -14,9 +14,9 @@ javac -d out $(find src/main/java -name '*.java')
 java -cp out puzzle.PuzzleApp
 ```
 
-Select a difficulty from the dropdown, then use the `随机生成` button to create a new 10x10 puzzle with a unique solution. The generator grows random board shapes and verifies uniqueness with the solver; it does not rotate or mirror fixed sample boards.
+The app starts without a built-in default puzzle. Select a difficulty from the dropdown, then use the `随机生成` button to create a new 10x10 puzzle with a unique solution. You can also use `加载棋盘` to open a board text file, and `保存棋盘` to save the current board as a `0`/`1` text file.
 
-You can also open a board text file from the UI, or pass one on startup:
+You can pass a board file on startup:
 
 ```bash
 java -cp out puzzle.PuzzleApp board.txt
@@ -38,7 +38,6 @@ The generated board is printed to stdout. The difficulty, seed, attempt count, e
 ## Check Uniqueness
 
 ```bash
-java -cp out puzzle.PuzzleApp --check
 java -cp out puzzle.PuzzleApp --check board.txt
 ```
 

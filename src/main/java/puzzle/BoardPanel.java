@@ -20,7 +20,7 @@ public final class BoardPanel extends JPanel {
     private static final Color GRID_LINE = new Color(0xcfd6de);
     private static final Color ANSWER_LINE = new Color(0x18a957);
 
-    private Board board = Board.defaultBoard();
+    private Board board = Board.empty(10, 10);
     private List<Integer> solutionPath = List.of();
     private boolean showAnswer;
     private String overlayText = "";

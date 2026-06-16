@@ -27,6 +27,7 @@ public final class PuzzleApp {
     private final JLabel statusLabel = new JLabel(" ");
     private final JToggleButton answerButton = new JToggleButton("显示答案");
     private final JButton generateButton = new JButton("随机生成");
+    private final JButton saveButton = new JButton("保存棋盘");
     private final JComboBox<BoardGenerator.Difficulty> difficultyBox =
         new JComboBox<>(BoardGenerator.Difficulty.values());
     private Board board;
@@ -49,10 +50,12 @@ public final class PuzzleApp {
     }
 
     private static void runCliCheck(String[] args) {
+        if (args.length < 2) {
+            System.err.println("Usage: java -cp out puzzle.PuzzleApp --check board.txt");
+            System.exit(1);
+        }
         try {
-            Board board = args.length >= 2
-                ? Board.fromLines(Files.readAllLines(Path.of(args[1])))
-                : Board.defaultBoard();
+            Board board = Board.fromLines(Files.readAllLines(Path.of(args[1])));
             CycleSolver.Result result = CycleSolver.solve(board, SOLVER_NODE_LIMIT);
             if (result.aborted()) {
                 System.out.println("unknown");
@@ -78,18 +81,14 @@ public final class PuzzleApp {
             + " attempts=" + generated.attempts()
             + " elapsedMs=" + generated.elapsedMillis()
             + " solveNodes=" + generated.solveNodes());
-        for (int r = 0; r < board.rows(); r++) {
-            StringBuilder line = new StringBuilder(board.cols());
-            for (int c = 0; c < board.cols(); c++) {
-                line.append(board.isWhite(r, c) ? '1' : '0');
-            }
+        for (String line : board.toLines()) {
             System.out.println(line);
         }
     }
 
     private static Board loadInitialBoard(String[] args) {
         if (args.length == 0) {
-            return Board.defaultBoard();
+            return null;
         }
         try {
             return Board.fromLines(Files.readAllLines(Path.of(args[0])));
@@ -100,14 +99,17 @@ public final class PuzzleApp {
                 "加载失败",
                 JOptionPane.ERROR_MESSAGE
             );
-            return Board.defaultBoard();
+            return null;
         }
     }
 
     private PuzzleApp(Board initialBoard) {
-        this.board = initialBoard;
         configureFrame();
-        loadBoard(initialBoard);
+        if (initialBoard == null) {
+            showEmptyBoard();
+        } else {
+            loadBoard(initialBoard);
+        }
     }
 
     private void configureFrame() {
@@ -121,29 +123,43 @@ public final class PuzzleApp {
     }
 
     private JPanel createToolbar() {
-        JButton openButton = new JButton("打开棋盘");
-        JButton resetButton = new JButton("默认棋盘");
+        JButton openButton = new JButton("加载棋盘");
 
         answerButton.setEnabled(false);
+        saveButton.setEnabled(false);
         answerButton.addActionListener(event -> {
             boardPanel.setShowAnswer(answerButton.isSelected());
             answerButton.setText(answerButton.isSelected() ? "隐藏答案" : "显示答案");
         });
         openButton.addActionListener(event -> openBoardFile());
-        resetButton.addActionListener(event -> loadBoard(Board.defaultBoard()));
+        saveButton.addActionListener(event -> saveBoardFile());
         generateButton.addActionListener(event -> generateRandomBoard());
 
         JPanel toolbar = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 8));
         toolbar.add(difficultyBox);
         toolbar.add(generateButton);
         toolbar.add(openButton);
-        toolbar.add(resetButton);
+        toolbar.add(saveButton);
         toolbar.add(answerButton);
         return toolbar;
     }
 
     private void show() {
         frame.setVisible(true);
+    }
+
+    private void showEmptyBoard() {
+        board = null;
+        currentResult = new CycleSolver.Result(0, false, List.of(), 0);
+        boardPanel.setBoard(Board.empty(10, 10));
+        boardPanel.setSolutionPath(List.of());
+        boardPanel.setShowAnswer(false);
+        boardPanel.setOverlayText("随机生成或加载棋盘");
+        answerButton.setSelected(false);
+        answerButton.setText("显示答案");
+        answerButton.setEnabled(false);
+        saveButton.setEnabled(false);
+        statusLabel.setText("请选择随机生成或加载 0/1 棋盘文件");
     }
 
     private void openBoardFile() {
@@ -162,11 +178,54 @@ public final class PuzzleApp {
         }
     }
 
+    private void saveBoardFile() {
+        if (board == null) {
+            JOptionPane.showMessageDialog(frame, "当前没有可保存的棋盘", "保存失败", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
+        JFileChooser chooser = new JFileChooser();
+        chooser.setFileFilter(new FileNameExtensionFilter("Text board files", "txt", "board"));
+        int result = chooser.showSaveDialog(frame);
+        if (result != JFileChooser.APPROVE_OPTION) {
+            return;
+        }
+
+        Path path = withDefaultTxtExtension(chooser.getSelectedFile().toPath());
+        if (Files.exists(path)) {
+            int overwrite = JOptionPane.showConfirmDialog(
+                frame,
+                "文件已存在，是否覆盖？",
+                "确认保存",
+                JOptionPane.YES_NO_OPTION
+            );
+            if (overwrite != JOptionPane.YES_OPTION) {
+                return;
+            }
+        }
+
+        try {
+            Files.write(path, board.toLines());
+            statusLabel.setText("棋盘已保存到 " + path.getFileName());
+        } catch (IOException ex) {
+            JOptionPane.showMessageDialog(frame, ex.getMessage(), "保存失败", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    private Path withDefaultTxtExtension(Path path) {
+        String fileName = path.getFileName().toString();
+        if (fileName.contains(".")) {
+            return path;
+        }
+        return path.resolveSibling(fileName + ".txt");
+    }
+
     private void generateRandomBoard() {
         BoardGenerator.Difficulty difficulty = selectedDifficulty();
         answerButton.setSelected(false);
         answerButton.setText("显示答案");
         answerButton.setEnabled(false);
+        saveButton.setEnabled(false);
         generateButton.setEnabled(false);
         difficultyBox.setEnabled(false);
         boardPanel.setShowAnswer(false);
@@ -197,10 +256,12 @@ public final class PuzzleApp {
                             + "ms，白格 " + board.whiteCount() + " 个"
                     );
                     answerButton.setEnabled(true);
+                    saveButton.setEnabled(true);
                 } catch (Exception ex) {
                     boardPanel.setOverlayText("");
                     statusLabel.setText("随机生成失败：" + ex.getMessage());
                     answerButton.setEnabled(false);
+                    saveButton.setEnabled(board != null);
                 }
             }
         };
@@ -224,6 +285,7 @@ public final class PuzzleApp {
         answerButton.setSelected(false);
         answerButton.setText("显示答案");
         answerButton.setEnabled(false);
+        saveButton.setEnabled(true);
         statusLabel.setText("正在求解 " + board.rows() + "x" + board.cols() + "，白格 " + board.whiteCount() + " 个...");
         boardPanel.setOverlayText("正在求解");
 

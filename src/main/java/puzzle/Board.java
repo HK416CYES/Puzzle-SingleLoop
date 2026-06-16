@@ -4,19 +4,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 public final class Board {
-    private static final String[] DEFAULT_ROWS = {
-        "0111110110",
-        "0111111111",
-        "1110111111",
-        "1010110110",
-        "1110110110",
-        "0110110000",
-        "0000110110",
-        "1111110110",
-        "1111111111",
-        "0110111111",
-    };
-
     private final int rows;
     private final int cols;
     private final boolean[] white;
@@ -27,6 +14,13 @@ public final class Board {
         this.white = white;
     }
 
+    public static Board empty(int rows, int cols) {
+        if (rows <= 0 || cols <= 0) {
+            throw new IllegalArgumentException("棋盘尺寸必须为正数");
+        }
+        return new Board(rows, cols, new boolean[rows * cols]);
+    }
+
     public static Board fromCells(int rows, int cols, boolean[] white) {
         if (rows <= 0 || cols <= 0) {
             throw new IllegalArgumentException("棋盘尺寸必须为正数");
@@ -35,10 +29,6 @@ public final class Board {
             throw new IllegalArgumentException("棋盘数据长度和尺寸不匹配");
         }
         return new Board(rows, cols, white.clone());
-    }
-
-    public static Board defaultBoard() {
-        return fromLines(List.of(DEFAULT_ROWS));
     }
 
     public static Board fromLines(List<String> rawLines) {
@@ -76,6 +66,18 @@ public final class Board {
         }
 
         return new Board(rows, cols, white);
+    }
+
+    public List<String> toLines() {
+        List<String> lines = new ArrayList<>(rows);
+        for (int r = 0; r < rows; r++) {
+            StringBuilder line = new StringBuilder(cols);
+            for (int c = 0; c < cols; c++) {
+                line.append(isWhite(r, c) ? '1' : '0');
+            }
+            lines.add(line.toString());
+        }
+        return lines;
     }
 
     private static int index(int cols, int row, int col) {
