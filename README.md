@@ -14,7 +14,7 @@ javac -d out $(find src/main/java -name '*.java')
 java -cp out puzzle.PuzzleApp
 ```
 
-The app starts without a built-in default puzzle. Select a difficulty from the dropdown, then use the `随机生成` button to create a new 10x10 puzzle with a unique solution. You can also use `加载棋盘` to open a board text file, and `保存棋盘` to save the current board as a `0`/`1` text file.
+When opened without a board file, the app automatically generates one normal-difficulty puzzle. Select a difficulty from the dropdown, then use the `随机生成` button to create another 10x10 puzzle with a unique solution. You can also use `加载棋盘` to open a board text file, and `保存棋盘` to save the current board as a `0`/`1` text file.
 
 You can pass a board file on startup:
 
@@ -23,6 +23,22 @@ java -cp out puzzle.PuzzleApp board.txt
 ```
 
 The board file should contain only `0` and `1`, one row per line. `1` is a white cell and `0` is a black cell.
+
+## Package For Windows
+
+Run this on Windows with JDK 21 or newer installed and available on `PATH`:
+
+```bat
+scripts\package-windows.bat
+```
+
+The script builds the app and creates a Windows app image at:
+
+```text
+dist\windows\Puzzle\Puzzle.exe
+```
+
+`jpackage` creates platform-specific executables, so the Windows `.exe` must be built on Windows.
 
 ## Generate From CLI
 

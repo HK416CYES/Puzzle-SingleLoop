@@ -2,6 +2,7 @@
 out/
 build/
 target/
+dist/
 *.class
 
 # IDE files

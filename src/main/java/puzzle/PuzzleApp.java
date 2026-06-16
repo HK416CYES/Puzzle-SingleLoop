@@ -31,6 +31,7 @@ public final class PuzzleApp {
     private final JComboBox<BoardGenerator.Difficulty> difficultyBox =
         new JComboBox<>(BoardGenerator.Difficulty.values());
     private Board board;
+    private boolean autoGenerateOnShow;
     private CycleSolver.Result currentResult = new CycleSolver.Result(0, false, List.of(), 0);
 
     public static void main(String[] args) {
@@ -107,6 +108,7 @@ public final class PuzzleApp {
         configureFrame();
         if (initialBoard == null) {
             showEmptyBoard();
+            autoGenerateOnShow = true;
         } else {
             loadBoard(initialBoard);
         }
@@ -146,6 +148,10 @@ public final class PuzzleApp {
 
     private void show() {
         frame.setVisible(true);
+        if (autoGenerateOnShow) {
+            autoGenerateOnShow = false;
+            generateRandomBoard();
+        }
     }
 
     private void showEmptyBoard() {
@@ -159,7 +165,7 @@ public final class PuzzleApp {
         answerButton.setText("显示答案");
         answerButton.setEnabled(false);
         saveButton.setEnabled(false);
-        statusLabel.setText("请选择随机生成或加载 0/1 棋盘文件");
+        statusLabel.setText("正在准备自动生成棋盘...");
     }
 
     private void openBoardFile() {
