@@ -18,11 +18,11 @@ set JAR_DIR=%BUILD_DIR%\jar
 set JAR_FILE=%APP_NAME%.jar
 set DIST_DIR=dist\windows
 
-call :require_tool javac "Install JDK 21 or newer and add it to PATH."
+call :resolve_jdk_tool javac JAVAC_CMD
 if errorlevel 1 goto fail
-call :require_tool jar "Install JDK 21 or newer and add it to PATH."
+call :resolve_jdk_tool jar JAR_CMD
 if errorlevel 1 goto fail
-call :require_tool jpackage "Install JDK 21 or newer and add it to PATH."
+call :resolve_jdk_tool jpackage JPACKAGE_CMD
 if errorlevel 1 goto fail
 
 echo Cleaning previous build...
@@ -34,15 +34,15 @@ mkdir "%DIST_DIR%"
 
 echo Compiling Java sources...
 dir /s /b src\puzzle\*.java > "%BUILD_DIR%\sources.txt"
-javac -encoding UTF-8 -d "%CLASS_DIR%" @"%BUILD_DIR%\sources.txt"
+"%JAVAC_CMD%" -encoding UTF-8 -d "%CLASS_DIR%" @"%BUILD_DIR%\sources.txt"
 if errorlevel 1 goto fail
 
 echo Creating runnable jar...
-jar --create --file "%JAR_DIR%\%JAR_FILE%" --main-class "%MAIN_CLASS%" -C "%CLASS_DIR%" .
+"%JAR_CMD%" --create --file "%JAR_DIR%\%JAR_FILE%" --main-class "%MAIN_CLASS%" -C "%CLASS_DIR%" .
 if errorlevel 1 goto fail
 
 echo Creating Windows app image...
-jpackage ^
+"%JPACKAGE_CMD%" ^
   --type app-image ^
   --name "%APP_NAME%" ^
   --input "%JAR_DIR%" ^
@@ -61,13 +61,60 @@ popd >nul
 pause
 exit /b 0
 
-:require_tool
-where %~1 >nul 2>nul
-if errorlevel 1 (
-    echo %~1 was not found. %~2
-    exit /b 1
+:resolve_jdk_tool
+set "%~2="
+call :try_tool_from_path %~1 %~2
+if defined %~2 exit /b 0
+
+call :try_tool_from_java_home %~1 %~2
+if defined %~2 exit /b 0
+
+call :try_tool_from_installed_jdks %~1 %~2
+if defined %~2 exit /b 0
+
+echo %~1 was not found in a JDK 21+ installation. Install JDK 21 or newer, or update PATH/JAVA_HOME.
+exit /b 1
+
+:try_tool_from_path
+for /f "delims=" %%I in ('where %~1 2^>nul') do (
+    call :is_java21_or_newer "%%~fI"
+    if not errorlevel 1 (
+        set "%~2=%%~fI"
+        exit /b 0
+    )
 )
 exit /b 0
+
+:try_tool_from_java_home
+if not defined JAVA_HOME exit /b 0
+call :try_explicit_tool "%JAVA_HOME%\bin\%~1.exe" %~2
+exit /b 0
+
+:try_tool_from_installed_jdks
+for /d %%D in ("C:\Program Files\Java\jdk-*") do (
+    call :try_explicit_tool "%%~fD\bin\%~1.exe" %~2
+    if defined %~2 exit /b 0
+)
+exit /b 0
+
+:try_explicit_tool
+if not exist "%~1" exit /b 0
+call :is_java21_or_newer "%~1"
+if errorlevel 1 exit /b 0
+set "%~2=%~1"
+exit /b 0
+
+:is_java21_or_newer
+set "CHECK_DIR=%~dp1..\"
+
+if exist "%CHECK_DIR%release" (
+    for /f "tokens=2 delims==" %%V in ('findstr /b "JAVA_VERSION=" "%CHECK_DIR%release" 2^>nul') do (
+        for /f "tokens=1 delims=." %%M in ("%%~V") do (
+            if %%M GEQ 21 exit /b 0
+        )
+    )
+)
+exit /b 1
 
 :fail
 echo.

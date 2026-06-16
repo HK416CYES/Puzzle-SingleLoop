@@ -26,7 +26,7 @@ The board file should contain only `0` and `1`, one row per line. `1` is a white
 
 ## Package For Windows
 
-Run this on Windows with JDK 21 or newer installed and available on `PATH`:
+Run this on Windows with JDK 21 or newer installed. The script first checks `PATH`, then falls back to installed JDK directories under `C:\Program Files\Java`:
 
 ```bat
 scripts\package-windows.bat
