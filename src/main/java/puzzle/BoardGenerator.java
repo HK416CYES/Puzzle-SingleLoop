@@ -6,14 +6,15 @@ import java.util.List;
 import java.util.Random;
 
 public final class BoardGenerator {
-    public record Generated(Board board, CycleSolver.Result result, long seed, int attempts) {
+    public record Generated(Board board, CycleSolver.Result result, long seed, int attempts,
+                            long elapsedMillis, long solveNodes) {
     }
 
     private record DifficultyProfile(int minBlacks, int maxBlacks, int minRowColumnRuns, int maxRepeatedRows,
                                      int minJunctions, int minFullBlocks) {
     }
 
-    private record Ear(int a, int b) {
+    private record Ear(int edgeIndex, int a, int b) {
     }
 
     public enum Difficulty {
@@ -47,7 +48,8 @@ public final class BoardGenerator {
 
     private static final int ROWS = 10;
     private static final int COLS = 10;
-    private static final long GENERATOR_SOLVER_LIMIT = 5_000_000L;
+    private static final long FINAL_SOLVER_LIMIT = 40_000_000L;
+    private static final long STEP_SOLVER_LIMIT = 1_000_000L;
 
     private BoardGenerator() {
     }
@@ -57,8 +59,7 @@ public final class BoardGenerator {
     }
 
     public static Generated generate(Difficulty difficulty) {
-        long seed = System.nanoTime();
-        return generate(difficulty, seed, 5000);
+        return generate(difficulty, System.nanoTime(), 5000);
     }
 
     public static Generated generate(long seed, int maxAttempts) {
@@ -66,102 +67,80 @@ public final class BoardGenerator {
     }
 
     public static Generated generate(Difficulty difficulty, long seed, int maxAttempts) {
-        if (difficulty == Difficulty.HARD) {
-            return generateHard(seed, maxAttempts);
-        }
-
+        long started = System.nanoTime();
         Random random = new Random(seed);
+        DifficultyProfile profile = profileFor(difficulty);
+        long solveNodes = 0;
+
         for (int attempt = 1; attempt <= maxAttempts; attempt++) {
-            boolean[] cells = buildCandidate(difficulty, random);
-            if (!qualityOk(cells, difficulty)) {
+            RingBoard ring = RingBoard.randomSeed(random);
+            int targetWhites = ROWS * COLS - evenBetween(random, profile.minBlacks(), profile.maxBlacks());
+
+            growForced(ring, targetWhites, random);
+            if (difficulty == Difficulty.HARD && ring.whiteCount() < targetWhites) {
+                solveNodes += growWithLowRiskSteps(ring, targetWhites, random);
+            }
+
+            if (!qualityOk(ring.white, difficulty)) {
                 continue;
             }
 
-            Board board = Board.fromCells(ROWS, COLS, cells);
-            CycleSolver.Result result = CycleSolver.solve(board, GENERATOR_SOLVER_LIMIT);
+            Board board = Board.fromCells(ROWS, COLS, ring.white);
+            CycleSolver.Result result = CycleSolver.solve(board, FINAL_SOLVER_LIMIT);
+            solveNodes += result.nodes();
             if (result.hasUniqueSolution()) {
-                return new Generated(board, result, seed, attempt);
+                long elapsedMillis = (System.nanoTime() - started) / 1_000_000L;
+                return new Generated(board, result, seed, attempt, elapsedMillis, solveNodes);
             }
         }
+
         throw new IllegalStateException("没有生成唯一解棋盘，请重试");
     }
 
-    private static Generated generateHard(long seed, int maxAttempts) {
-        Random random = new Random(seed);
-        DifficultyProfile hardProfile = profileFor(Difficulty.HARD);
-
-        for (int attempt = 1; attempt <= maxAttempts; attempt++) {
-            boolean[] cells = buildCandidate(Difficulty.NORMAL, random);
-            if (!qualityOk(cells, Difficulty.NORMAL)) {
-                continue;
+    private static void growForced(RingBoard ring, int targetWhites, Random random) {
+        while (ring.whiteCount() < targetWhites) {
+            List<Ear> ears = ring.collectEars(true);
+            if (ears.isEmpty()) {
+                return;
             }
+            ring.apply(ears.get(random.nextInt(ears.size())));
+        }
+    }
 
-            Board board = Board.fromCells(ROWS, COLS, cells);
-            CycleSolver.Result result = CycleSolver.solve(board, GENERATOR_SOLVER_LIMIT);
-            if (!result.hasUniqueSolution()) {
-                continue;
-            }
+    private static long growWithLowRiskSteps(RingBoard ring, int targetWhites, Random random) {
+        long solveNodes = 0;
+        while (ring.whiteCount() < targetWhites) {
+            List<Ear> ears = ring.collectEars(false);
+            Collections.shuffle(ears, random);
+            boolean accepted = false;
+            int checked = 0;
 
-            int targetWhites = ROWS * COLS - evenBetween(random, hardProfile.minBlacks(), hardProfile.maxBlacks());
-            while (whiteCount(cells) < targetWhites) {
-                List<Ear> ears = collectExpansionEars(cells, false);
-                Collections.shuffle(ears, random);
-                boolean accepted = false;
-                int checked = 0;
-                for (Ear ear : ears) {
-                    if (++checked > 80) {
-                        break;
-                    }
-                    boolean[] next = cells.clone();
-                    next[ear.a()] = true;
-                    next[ear.b()] = true;
-                    if (!locallyValid(next)) {
-                        continue;
-                    }
-
-                    Board nextBoard = Board.fromCells(ROWS, COLS, next);
-                    CycleSolver.Result nextResult = CycleSolver.solve(nextBoard, GENERATOR_SOLVER_LIMIT);
-                    if (nextResult.hasUniqueSolution()) {
-                        cells = next;
-                        result = nextResult;
-                        accepted = true;
-                        break;
-                    }
+            for (Ear ear : ears) {
+                if (++checked > 80) {
+                    break;
                 }
 
-                if (!accepted) {
+                boolean[] next = ring.copyWith(ear);
+                if (!locallyValid(next)) {
+                    continue;
+                }
+
+                Board nextBoard = Board.fromCells(ROWS, COLS, next);
+                CycleSolver.Result result = CycleSolver.solve(nextBoard, STEP_SOLVER_LIMIT);
+                solveNodes += result.nodes();
+                if (result.hasUniqueSolution()) {
+                    ring.white = next;
+                    ring.setPath(result.path());
+                    accepted = true;
                     break;
                 }
             }
 
-            if (qualityOk(cells, Difficulty.HARD)) {
-                return new Generated(Board.fromCells(ROWS, COLS, cells), result, seed, attempt);
-            }
-        }
-
-        throw new IllegalStateException("没有生成唯一解棋盘，请重试");
-    }
-
-    private static boolean[] buildCandidate(Difficulty difficulty, Random random) {
-        boolean[] cells = new boolean[ROWS * COLS];
-        DifficultyProfile profile = profileFor(difficulty);
-        int targetWhites = ROWS * COLS - evenBetween(random, profile.minBlacks(), profile.maxBlacks());
-        seedRandomBlock(cells, random);
-
-        while (whiteCount(cells) < targetWhites) {
-            List<Ear> ears = collectExpansionEars(cells, true);
-            if (ears.isEmpty() && difficulty == Difficulty.HARD) {
-                ears = collectExpansionEars(cells, false);
-            }
-            if (ears.isEmpty()) {
+            if (!accepted) {
                 break;
             }
-            Ear ear = ears.get(random.nextInt(ears.size()));
-            cells[ear.a()] = true;
-            cells[ear.b()] = true;
         }
-
-        return cells;
+        return solveNodes;
     }
 
     private static DifficultyProfile profileFor(Difficulty difficulty) {
@@ -175,106 +154,6 @@ public final class BoardGenerator {
         int min = minInclusive + (minInclusive & 1);
         int max = maxInclusive - (maxInclusive & 1);
         return min + random.nextInt((max - min) / 2 + 1) * 2;
-    }
-
-    private static void seedRandomBlock(boolean[] cells, Random random) {
-        int r = random.nextInt(ROWS - 1);
-        int c = random.nextInt(COLS - 1);
-        cells[index(r, c)] = true;
-        cells[index(r + 1, c)] = true;
-        cells[index(r, c + 1)] = true;
-        cells[index(r + 1, c + 1)] = true;
-    }
-
-    private static List<Ear> collectExpansionEars(boolean[] cells, boolean forcedOnly) {
-        ArrayList<Ear> ears = new ArrayList<>();
-
-        for (int r = 0; r < ROWS; r++) {
-            for (int c = 0; c + 1 < COLS; c++) {
-                int left = index(r, c);
-                int right = index(r, c + 1);
-                if (!cells[left] || !cells[right]) {
-                    continue;
-                }
-                addHorizontalEar(cells, ears, r - 1, c, forcedOnly);
-                addHorizontalEar(cells, ears, r + 1, c, forcedOnly);
-            }
-        }
-
-        for (int r = 0; r + 1 < ROWS; r++) {
-            for (int c = 0; c < COLS; c++) {
-                int top = index(r, c);
-                int bottom = index(r + 1, c);
-                if (!cells[top] || !cells[bottom]) {
-                    continue;
-                }
-                addVerticalEar(cells, ears, r, c - 1, forcedOnly);
-                addVerticalEar(cells, ears, r, c + 1, forcedOnly);
-            }
-        }
-
-        return ears;
-    }
-
-    private static void addHorizontalEar(boolean[] cells, List<Ear> ears, int row, int col, boolean forcedOnly) {
-        if (row < 0 || row >= ROWS || col < 0 || col + 1 >= COLS) {
-            return;
-        }
-        int a = index(row, col);
-        int b = index(row, col + 1);
-        if (!cells[a] && !cells[b] && acceptableAfterAdd(cells, a, b, forcedOnly)) {
-            ears.add(new Ear(a, b));
-        }
-    }
-
-    private static void addVerticalEar(boolean[] cells, List<Ear> ears, int row, int col, boolean forcedOnly) {
-        if (row < 0 || row + 1 >= ROWS || col < 0 || col >= COLS) {
-            return;
-        }
-        int a = index(row, col);
-        int b = index(row + 1, col);
-        if (!cells[a] && !cells[b] && acceptableAfterAdd(cells, a, b, forcedOnly)) {
-            ears.add(new Ear(a, b));
-        }
-    }
-
-    private static boolean acceptableAfterAdd(boolean[] cells, int a, int b, boolean forcedOnly) {
-        boolean[] next = cells.clone();
-        next[a] = true;
-        next[b] = true;
-        int da = degree(next, a);
-        int db = degree(next, b);
-        if (forcedOnly) {
-            return da == 2 && db == 2;
-        }
-        return da <= 3 && db <= 3;
-    }
-
-    private static int whiteCount(boolean[] cells) {
-        int count = 0;
-        for (boolean cell : cells) {
-            if (cell) {
-                count++;
-            }
-        }
-        return count;
-    }
-
-    private static List<Integer> whiteNeighbors(boolean[] cells, int cell) {
-        ArrayList<Integer> result = new ArrayList<>(4);
-        int row = cell / COLS;
-        int col = cell % COLS;
-        addWhiteNeighbor(cells, result, row - 1, col);
-        addWhiteNeighbor(cells, result, row + 1, col);
-        addWhiteNeighbor(cells, result, row, col - 1);
-        addWhiteNeighbor(cells, result, row, col + 1);
-        return result;
-    }
-
-    private static void addWhiteNeighbor(boolean[] cells, List<Integer> result, int row, int col) {
-        if (row >= 0 && row < ROWS && col >= 0 && col < COLS && cells[index(row, col)]) {
-            result.add(index(row, col));
-        }
     }
 
     private static boolean qualityOk(boolean[] cells, Difficulty difficulty) {
@@ -317,6 +196,7 @@ public final class BoardGenerator {
 
         for (int r = 0; r < ROWS; r++) {
             boolean inRun = false;
+            boolean hasBlack = false;
             for (int c = 0; c < COLS; c++) {
                 if (cells[index(r, c)]) {
                     if (!inRun) {
@@ -325,12 +205,17 @@ public final class BoardGenerator {
                     inRun = true;
                 } else {
                     inRun = false;
+                    hasBlack = true;
                 }
+            }
+            if (hasBlack) {
+                blackRows++;
             }
         }
 
         for (int c = 0; c < COLS; c++) {
             boolean inRun = false;
+            boolean hasBlack = false;
             for (int r = 0; r < ROWS; r++) {
                 if (cells[index(r, c)]) {
                     if (!inRun) {
@@ -339,7 +224,11 @@ public final class BoardGenerator {
                     inRun = true;
                 } else {
                     inRun = false;
+                    hasBlack = true;
                 }
+            }
+            if (hasBlack) {
+                blackCols++;
             }
         }
 
@@ -356,36 +245,6 @@ public final class BoardGenerator {
             }
         }
 
-        for (int r = 0; r < ROWS; r++) {
-            boolean hasBlack = false;
-            for (int c = 0; c < COLS; c++) {
-                if (!cells[index(r, c)]) {
-                    hasBlack = true;
-                    break;
-                }
-            }
-            if (hasBlack) {
-                blackRows++;
-            }
-        }
-
-        for (int c = 0; c < COLS; c++) {
-            boolean hasBlack = false;
-            for (int r = 0; r < ROWS; r++) {
-                if (!cells[index(r, c)]) {
-                    hasBlack = true;
-                    break;
-                }
-            }
-            if (hasBlack) {
-                blackCols++;
-            }
-        }
-
-        if (!isWhiteConnected(cells)) {
-            return false;
-        }
-
         boolean baseQuality = whites >= 12
             && (whites & 1) == 0
             && junctions >= profile.minJunctions()
@@ -394,7 +253,8 @@ public final class BoardGenerator {
             && rowRuns + colRuns >= profile.minRowColumnRuns()
             && repeatedAdjacentRows <= profile.maxRepeatedRows()
             && blackRows >= 4
-            && blackCols >= 4;
+            && blackCols >= 4
+            && isWhiteConnected(cells);
 
         if (difficulty == Difficulty.HARD) {
             return baseQuality && whites >= 84 && whites <= 90;
@@ -427,21 +287,35 @@ public final class BoardGenerator {
         }
 
         boolean[] seen = new boolean[cells.length];
-        ArrayList<Integer> stack = new ArrayList<>();
-        stack.add(start);
-        seen[start] = true;
+        int[] stack = new int[cells.length];
+        int stackSize = 0;
         int reached = 0;
-        while (!stack.isEmpty()) {
-            int cell = stack.remove(stack.size() - 1);
+        seen[start] = true;
+        stack[stackSize++] = start;
+        while (stackSize > 0) {
+            int cell = stack[--stackSize];
             reached++;
-            for (int next : whiteNeighbors(cells, cell)) {
-                if (!seen[next]) {
-                    seen[next] = true;
-                    stack.add(next);
-                }
-            }
+            int row = cell / COLS;
+            int col = cell % COLS;
+            stackSize = pushIfWhite(cells, seen, stack, stackSize, row - 1, col);
+            stackSize = pushIfWhite(cells, seen, stack, stackSize, row + 1, col);
+            stackSize = pushIfWhite(cells, seen, stack, stackSize, row, col - 1);
+            stackSize = pushIfWhite(cells, seen, stack, stackSize, row, col + 1);
         }
         return reached == whites;
+    }
+
+    private static int pushIfWhite(boolean[] cells, boolean[] seen, int[] stack, int stackSize, int row, int col) {
+        if (row < 0 || row >= ROWS || col < 0 || col >= COLS) {
+            return stackSize;
+        }
+        int cell = index(row, col);
+        if (!cells[cell] || seen[cell]) {
+            return stackSize;
+        }
+        seen[cell] = true;
+        stack[stackSize++] = cell;
+        return stackSize;
     }
 
     private static int degree(boolean[] cells, int cell) {
@@ -465,5 +339,120 @@ public final class BoardGenerator {
 
     private static int index(int row, int col) {
         return row * COLS + col;
+    }
+
+    private static final class RingBoard {
+        private boolean[] white;
+        private final ArrayList<Integer> path = new ArrayList<>();
+        private final int[] pathIndex = new int[ROWS * COLS];
+
+        private RingBoard(int startRow, int startCol) {
+            white = new boolean[ROWS * COLS];
+            int a = index(startRow, startCol);
+            int b = index(startRow, startCol + 1);
+            int c = index(startRow + 1, startCol + 1);
+            int d = index(startRow + 1, startCol);
+            white[a] = white[b] = white[c] = white[d] = true;
+            path.add(a);
+            path.add(b);
+            path.add(c);
+            path.add(d);
+            rebuildPathIndex();
+        }
+
+        private static RingBoard randomSeed(Random random) {
+            return new RingBoard(random.nextInt(ROWS - 1), random.nextInt(COLS - 1));
+        }
+
+        private int whiteCount() {
+            return path.size();
+        }
+
+        private List<Ear> collectEars(boolean forcedOnly) {
+            ArrayList<Ear> ears = new ArrayList<>();
+            for (int i = 0; i < path.size(); i++) {
+                int a = path.get(i);
+                int b = path.get((i + 1) % path.size());
+                addEarsForEdge(ears, i, a, b, forcedOnly);
+            }
+            return ears;
+        }
+
+        private void addEarsForEdge(List<Ear> ears, int edgeIndex, int a, int b, boolean forcedOnly) {
+            int ar = a / COLS;
+            int ac = a % COLS;
+            int br = b / COLS;
+            int bc = b % COLS;
+
+            if (ar == br) {
+                addEar(ears, edgeIndex, ar - 1, ac, ar - 1, bc, forcedOnly);
+                addEar(ears, edgeIndex, ar + 1, ac, ar + 1, bc, forcedOnly);
+            } else if (ac == bc) {
+                addEar(ears, edgeIndex, ar, ac - 1, br, ac - 1, forcedOnly);
+                addEar(ears, edgeIndex, ar, ac + 1, br, ac + 1, forcedOnly);
+            }
+        }
+
+        private void addEar(List<Ear> ears, int edgeIndex, int ar, int ac, int br, int bc, boolean forcedOnly) {
+            if (ar < 0 || ar >= ROWS || ac < 0 || ac >= COLS
+                || br < 0 || br >= ROWS || bc < 0 || bc >= COLS) {
+                return;
+            }
+
+            int a = index(ar, ac);
+            int b = index(br, bc);
+            if (a == b || white[a] || white[b]) {
+                return;
+            }
+
+            boolean[] next = white.clone();
+            next[a] = true;
+            next[b] = true;
+            int da = degree(next, a);
+            int db = degree(next, b);
+            if ((forcedOnly && da == 2 && db == 2) || (!forcedOnly && da <= 3 && db <= 3)) {
+                ears.add(new Ear(edgeIndex, a, b));
+            }
+        }
+
+        private boolean[] copyWith(Ear ear) {
+            boolean[] next = white.clone();
+            next[ear.a()] = true;
+            next[ear.b()] = true;
+            return next;
+        }
+
+        private void apply(Ear ear) {
+            white[ear.a()] = true;
+            white[ear.b()] = true;
+            insertPathCells(ear);
+        }
+
+        private void setPath(List<Integer> cells) {
+            path.clear();
+            path.addAll(cells);
+            rebuildPathIndex();
+        }
+
+        private void insertPathCells(Ear ear) {
+            int insertAt = ear.edgeIndex() + 1;
+            if (insertAt >= path.size()) {
+                path.add(ear.a());
+                path.add(ear.b());
+            } else {
+                path.add(insertAt, ear.a());
+                path.add(insertAt + 1, ear.b());
+            }
+            rebuildPathIndex();
+        }
+
+        private void rebuildPathIndex() {
+            for (int i = 0; i < pathIndex.length; i++) {
+                pathIndex[i] = -1;
+            }
+            for (int i = 0; i < path.size(); i++) {
+                pathIndex[path.get(i)] = i;
+            }
+        }
     }
 }

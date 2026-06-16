@@ -30,7 +30,7 @@ public final class PuzzleApp {
     private final JComboBox<BoardGenerator.Difficulty> difficultyBox =
         new JComboBox<>(BoardGenerator.Difficulty.values());
     private Board board;
-    private CycleSolver.Result currentResult = new CycleSolver.Result(0, false, List.of());
+    private CycleSolver.Result currentResult = new CycleSolver.Result(0, false, List.of(), 0);
 
     public static void main(String[] args) {
         if (args.length > 0 && "--check".equals(args[0])) {
@@ -69,11 +69,15 @@ public final class PuzzleApp {
         BoardGenerator.Difficulty difficulty = args.length >= 2
             ? BoardGenerator.Difficulty.fromText(args[1])
             : BoardGenerator.Difficulty.NORMAL;
-        BoardGenerator.Generated generated = BoardGenerator.generate(difficulty);
+        BoardGenerator.Generated generated = args.length >= 3
+            ? BoardGenerator.generate(difficulty, Long.parseLong(args[2]), 5000)
+            : BoardGenerator.generate(difficulty);
         Board board = generated.board();
         System.err.println("difficulty=" + difficulty.name().toLowerCase()
             + " seed=" + generated.seed()
-            + " attempts=" + generated.attempts());
+            + " attempts=" + generated.attempts()
+            + " elapsedMs=" + generated.elapsedMillis()
+            + " solveNodes=" + generated.solveNodes());
         for (int r = 0; r < board.rows(); r++) {
             StringBuilder line = new StringBuilder(board.cols());
             for (int c = 0; c < board.cols(); c++) {
@@ -189,7 +193,8 @@ public final class PuzzleApp {
                     statusLabel.setText(
                         difficulty.label() + "难度棋盘已生成，seed=" + generated.seed()
                             + "，尝试 " + generated.attempts()
-                            + " 次，白格 " + board.whiteCount() + " 个"
+                            + " 次，用时 " + generated.elapsedMillis()
+                            + "ms，白格 " + board.whiteCount() + " 个"
                     );
                     answerButton.setEnabled(true);
                 } catch (Exception ex) {
@@ -214,7 +219,7 @@ public final class PuzzleApp {
         generateButton.setEnabled(true);
         difficultyBox.setEnabled(true);
         this.board = newBoard;
-        this.currentResult = new CycleSolver.Result(0, false, List.of());
+        this.currentResult = new CycleSolver.Result(0, false, List.of(), 0);
         boardPanel.setBoard(newBoard);
         answerButton.setSelected(false);
         answerButton.setText("显示答案");

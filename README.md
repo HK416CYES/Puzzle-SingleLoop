@@ -30,9 +30,10 @@ The board file should contain only `0` and `1`, one row per line. `1` is a white
 java -cp out puzzle.PuzzleApp --generate
 java -cp out puzzle.PuzzleApp --generate normal
 java -cp out puzzle.PuzzleApp --generate hard
+java -cp out puzzle.PuzzleApp --generate hard 12345
 ```
 
-The generated board is printed to stdout. The difficulty, seed, and attempt count are printed to stderr.
+The generated board is printed to stdout. The difficulty, seed, attempt count, elapsed milliseconds, and solver node count are printed to stderr.
 
 ## Check Uniqueness
 
