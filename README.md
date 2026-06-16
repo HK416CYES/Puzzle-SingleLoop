@@ -5,7 +5,7 @@ This project contains a Java/Swing viewer for the black-white cycle puzzle.
 ## Build
 
 ```bash
-javac -d out $(find src/puzzle -name '*.java')
+javac --release 17 -d out $(find src/puzzle -name '*.java')
 ```
 
 ## Run UI
@@ -26,7 +26,7 @@ The board file should contain only `0` and `1`, one row per line. `1` is a white
 
 ## Package For Windows
 
-Run this on Windows with JDK 21 or newer installed. The script first checks `PATH`, then falls back to installed JDK directories under `C:\Program Files\Java`:
+Run this on Windows with JDK 17 or newer installed. The script first checks `PATH`, then falls back to installed JDK directories under `C:\Program Files\Java`:
 
 ```bat
 scripts\package-windows.bat

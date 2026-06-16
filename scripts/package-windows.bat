@@ -34,7 +34,7 @@ mkdir "%DIST_DIR%"
 
 echo Compiling Java sources...
 dir /s /b src\puzzle\*.java > "%BUILD_DIR%\sources.txt"
-"%JAVAC_CMD%" -encoding UTF-8 -d "%CLASS_DIR%" @"%BUILD_DIR%\sources.txt"
+"%JAVAC_CMD%" --release 17 -encoding UTF-8 -d "%CLASS_DIR%" @"%BUILD_DIR%\sources.txt"
 if errorlevel 1 goto fail
 
 echo Creating runnable jar...
@@ -72,12 +72,12 @@ if defined %~2 exit /b 0
 call :try_tool_from_installed_jdks %~1 %~2
 if defined %~2 exit /b 0
 
-echo %~1 was not found in a JDK 21+ installation. Install JDK 21 or newer, or update PATH/JAVA_HOME.
+echo %~1 was not found in a JDK 17+ installation. Install JDK 17 or newer, or update PATH/JAVA_HOME.
 exit /b 1
 
 :try_tool_from_path
 for /f "delims=" %%I in ('where %~1 2^>nul') do (
-    call :is_java21_or_newer "%%~fI"
+    call :is_java17_or_newer "%%~fI"
     if not errorlevel 1 (
         set "%~2=%%~fI"
         exit /b 0
@@ -99,18 +99,18 @@ exit /b 0
 
 :try_explicit_tool
 if not exist "%~1" exit /b 0
-call :is_java21_or_newer "%~1"
+call :is_java17_or_newer "%~1"
 if errorlevel 1 exit /b 0
 set "%~2=%~1"
 exit /b 0
 
-:is_java21_or_newer
+:is_java17_or_newer
 set "CHECK_DIR=%~dp1..\"
 
 if exist "%CHECK_DIR%release" (
     for /f "tokens=2 delims==" %%V in ('findstr /b "JAVA_VERSION=" "%CHECK_DIR%release" 2^>nul') do (
         for /f "tokens=1 delims=." %%M in ("%%~V") do (
-            if %%M GEQ 21 exit /b 0
+            if %%M GEQ 17 exit /b 0
         )
     )
 )
