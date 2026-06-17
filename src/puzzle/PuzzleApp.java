@@ -27,6 +27,9 @@ public final class PuzzleApp {
     private final JLabel statusLabel = new JLabel(" ");
     private final JToggleButton answerButton = new JToggleButton("显示答案");
     private final JButton generateButton = new JButton("随机生成");
+    private final JButton submitButton = new JButton("提交");
+    private final JButton undoButton = new JButton("←");
+    private final JButton redoButton = new JButton("→");
     private final JButton saveButton = new JButton("保存棋盘");
     private final JComboBox<BoardGenerator.Difficulty> difficultyBox =
         new JComboBox<>(BoardGenerator.Difficulty.values());
@@ -106,6 +109,7 @@ public final class PuzzleApp {
 
     private PuzzleApp(Board initialBoard) {
         configureFrame();
+        boardPanel.setPathChangeListener(this::updatePlayerControls);
         if (initialBoard == null) {
             showEmptyBoard();
             autoGenerateOnShow = true;
@@ -129,6 +133,9 @@ public final class PuzzleApp {
 
         answerButton.setEnabled(false);
         saveButton.setEnabled(false);
+        submitButton.setEnabled(false);
+        undoButton.setEnabled(false);
+        redoButton.setEnabled(false);
         answerButton.addActionListener(event -> {
             boardPanel.setShowAnswer(answerButton.isSelected());
             answerButton.setText(answerButton.isSelected() ? "隐藏答案" : "显示答案");
@@ -136,12 +143,24 @@ public final class PuzzleApp {
         openButton.addActionListener(event -> openBoardFile());
         saveButton.addActionListener(event -> saveBoardFile());
         generateButton.addActionListener(event -> generateRandomBoard());
+        submitButton.addActionListener(event -> submitAnswer());
+        undoButton.addActionListener(event -> {
+            boardPanel.undoPlayerPath();
+            updatePlayerControls();
+        });
+        redoButton.addActionListener(event -> {
+            boardPanel.redoPlayerPath();
+            updatePlayerControls();
+        });
 
         JPanel toolbar = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 8));
         toolbar.add(difficultyBox);
         toolbar.add(generateButton);
         toolbar.add(openButton);
         toolbar.add(saveButton);
+        toolbar.add(undoButton);
+        toolbar.add(redoButton);
+        toolbar.add(submitButton);
         toolbar.add(answerButton);
         return toolbar;
     }
@@ -165,6 +184,8 @@ public final class PuzzleApp {
         answerButton.setText("显示答案");
         answerButton.setEnabled(false);
         saveButton.setEnabled(false);
+        boardPanel.resetPlayerPath();
+        updatePlayerControls();
         statusLabel.setText("正在准备自动生成棋盘...");
     }
 
@@ -235,6 +256,8 @@ public final class PuzzleApp {
         generateButton.setEnabled(false);
         difficultyBox.setEnabled(false);
         boardPanel.setShowAnswer(false);
+        boardPanel.resetPlayerPath();
+        updatePlayerControls();
         boardPanel.setOverlayText("正在生成");
         statusLabel.setText("正在随机生成" + difficulty.label() + "难度唯一解棋盘...");
 
@@ -255,6 +278,7 @@ public final class PuzzleApp {
                     boardPanel.setBoard(board);
                     boardPanel.setSolutionPath(currentResult.path());
                     boardPanel.setOverlayText("");
+                    boardPanel.resetPlayerPath();
                     statusLabel.setText(
                         difficulty.label() + "难度棋盘已生成，seed=" + generated.seed()
                             + "，尝试 " + generated.attempts()
@@ -263,11 +287,13 @@ public final class PuzzleApp {
                     );
                     answerButton.setEnabled(true);
                     saveButton.setEnabled(true);
+                    updatePlayerControls();
                 } catch (Exception ex) {
                     boardPanel.setOverlayText("");
                     statusLabel.setText("随机生成失败：" + ex.getMessage());
                     answerButton.setEnabled(false);
                     saveButton.setEnabled(board != null);
+                    updatePlayerControls();
                 }
             }
         };
@@ -288,6 +314,7 @@ public final class PuzzleApp {
         this.board = newBoard;
         this.currentResult = new CycleSolver.Result(0, false, List.of(), 0);
         boardPanel.setBoard(newBoard);
+        boardPanel.resetPlayerPath();
         answerButton.setSelected(false);
         answerButton.setText("显示答案");
         answerButton.setEnabled(false);
@@ -310,10 +337,39 @@ public final class PuzzleApp {
                     boardPanel.setOverlayText("");
                     statusLabel.setText("求解失败：" + ex.getMessage());
                     answerButton.setEnabled(false);
+                    updatePlayerControls();
                 }
             }
         };
         worker.execute();
+    }
+
+    private void submitAnswer() {
+        if (board == null || currentResult.path().isEmpty()) {
+            JOptionPane.showMessageDialog(frame, "当前没有可提交的标准答案", "提交失败", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        boolean accepted = AnswerChecker.matches(
+            board,
+            boardPanel.playerPathCells(),
+            boardPanel.isPlayerPathClosed(),
+            currentResult.path()
+        );
+        if (accepted) {
+            statusLabel.setText("提交通过，答案正确");
+            JOptionPane.showMessageDialog(frame, "答案正确，通过！", "提交结果", JOptionPane.INFORMATION_MESSAGE);
+        } else {
+            statusLabel.setText("提交不通过，请检查路径是否闭环并覆盖所有白格");
+            JOptionPane.showMessageDialog(frame, "答案不正确", "提交结果", JOptionPane.WARNING_MESSAGE);
+        }
+    }
+
+    private void updatePlayerControls() {
+        boolean hasBoard = board != null;
+        boolean hasAnswer = hasBoard && !currentResult.path().isEmpty();
+        undoButton.setEnabled(hasBoard && boardPanel.canUndoPlayerPath());
+        redoButton.setEnabled(hasBoard && boardPanel.canRedoPlayerPath());
+        submitButton.setEnabled(hasAnswer && boardPanel.isPlayerPathClosed());
     }
 
     private void updateAfterSolve() {
@@ -323,22 +379,26 @@ public final class PuzzleApp {
         if (currentResult.aborted()) {
             statusLabel.setText("求解超出节点上限，无法确认唯一性");
             answerButton.setEnabled(false);
+            updatePlayerControls();
             return;
         }
 
         if (currentResult.solutionCount() == 0) {
             statusLabel.setText("没有合法环");
             answerButton.setEnabled(false);
+            updatePlayerControls();
             return;
         }
 
         if (currentResult.solutionCount() == 1) {
             statusLabel.setText("唯一解已找到，白格 " + board.whiteCount() + " 个");
             answerButton.setEnabled(true);
+            updatePlayerControls();
             return;
         }
 
         statusLabel.setText("存在多个合法环，显示其中一条答案");
         answerButton.setEnabled(!currentResult.path().isEmpty());
+        updatePlayerControls();
     }
 }
