@@ -11,15 +11,16 @@ public final class BoardGenerator {
     }
 
     private record DifficultyProfile(int minBlacks, int maxBlacks, int minRowColumnRuns, int maxRepeatedRows,
-                                     int minJunctions, int minFullBlocks) {
+                                     int minJunctions, int minFullBlocks, int lowRiskChecks) {
     }
 
     private record Ear(int edgeIndex, int a, int b) {
     }
 
     public enum Difficulty {
-        NORMAL("普通"),
-        HARD("高等");
+        EASY("简单"),
+        HARD("困难"),
+        HELL("地狱");
 
         private final String label;
 
@@ -37,8 +38,15 @@ public final class BoardGenerator {
         }
 
         public static Difficulty fromText(String text) {
+            String normalized = text == null ? "" : text.trim();
+            if (normalized.equalsIgnoreCase("normal") || normalized.equals("普通")) {
+                return EASY;
+            }
+            if (normalized.equals("高等")) {
+                return HARD;
+            }
             for (Difficulty difficulty : values()) {
-                if (difficulty.name().equalsIgnoreCase(text) || difficulty.label.equals(text)) {
+                if (difficulty.name().equalsIgnoreCase(normalized) || difficulty.label.equals(normalized)) {
                     return difficulty;
                 }
             }
@@ -55,15 +63,23 @@ public final class BoardGenerator {
     }
 
     public static Generated generate() {
-        return generate(Difficulty.NORMAL);
+        return generate(Difficulty.EASY);
     }
 
     public static Generated generate(Difficulty difficulty) {
-        return generate(difficulty, System.nanoTime(), 5000);
+        return generate(difficulty, System.nanoTime(), defaultMaxAttempts(difficulty));
+    }
+
+    public static Generated generate(Difficulty difficulty, long seed) {
+        return generate(difficulty, seed, defaultMaxAttempts(difficulty));
     }
 
     public static Generated generate(long seed, int maxAttempts) {
-        return generate(Difficulty.NORMAL, seed, maxAttempts);
+        return generate(Difficulty.EASY, seed, maxAttempts);
+    }
+
+    public static int defaultMaxAttempts(Difficulty difficulty) {
+        return difficulty == Difficulty.HELL ? 9000 : 5000;
     }
 
     public static Generated generate(Difficulty difficulty, long seed, int maxAttempts) {
@@ -77,8 +93,8 @@ public final class BoardGenerator {
             int targetWhites = ROWS * COLS - evenBetween(random, profile.minBlacks(), profile.maxBlacks());
 
             growForced(ring, targetWhites, random);
-            if (difficulty == Difficulty.HARD && ring.whiteCount() < targetWhites) {
-                solveNodes += growWithLowRiskSteps(ring, targetWhites, random);
+            if (difficulty != Difficulty.EASY && ring.whiteCount() < targetWhites) {
+                solveNodes += growWithLowRiskSteps(ring, targetWhites, random, profile.lowRiskChecks());
             }
 
             if (!qualityOk(ring.white, difficulty)) {
@@ -107,7 +123,7 @@ public final class BoardGenerator {
         }
     }
 
-    private static long growWithLowRiskSteps(RingBoard ring, int targetWhites, Random random) {
+    private static long growWithLowRiskSteps(RingBoard ring, int targetWhites, Random random, int maxChecksPerStep) {
         long solveNodes = 0;
         while (ring.whiteCount() < targetWhites) {
             List<Ear> ears = ring.collectEars(false);
@@ -116,7 +132,7 @@ public final class BoardGenerator {
             int checked = 0;
 
             for (Ear ear : ears) {
-                if (++checked > 80) {
+                if (++checked > maxChecksPerStep) {
                     break;
                 }
 
@@ -145,8 +161,9 @@ public final class BoardGenerator {
 
     private static DifficultyProfile profileFor(Difficulty difficulty) {
         return switch (difficulty) {
-            case NORMAL -> new DifficultyProfile(24, 34, 34, 2, 34, 8);
-            case HARD -> new DifficultyProfile(10, 16, 26, 4, 60, 30);
+            case EASY -> new DifficultyProfile(26, 38, 32, 3, 28, 6, 0);
+            case HARD -> new DifficultyProfile(16, 24, 28, 4, 48, 18, 60);
+            case HELL -> new DifficultyProfile(10, 16, 26, 4, 60, 30, 80);
         };
     }
 
@@ -256,10 +273,11 @@ public final class BoardGenerator {
             && blackCols >= 4
             && isWhiteConnected(cells);
 
-        if (difficulty == Difficulty.HARD) {
-            return baseQuality && whites >= 84 && whites <= 90;
-        }
-        return baseQuality && whites >= 66 && whites <= 76;
+        return switch (difficulty) {
+            case EASY -> baseQuality && whites >= 62 && whites <= 74;
+            case HARD -> baseQuality && whites >= 76 && whites <= 84;
+            case HELL -> baseQuality && whites >= 84 && whites <= 90;
+        };
     }
 
     private static boolean locallyValid(boolean[] cells) {

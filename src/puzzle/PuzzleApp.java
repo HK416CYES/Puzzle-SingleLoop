@@ -72,9 +72,9 @@ public final class PuzzleApp {
     private static void runCliGenerate(String[] args) {
         BoardGenerator.Difficulty difficulty = args.length >= 2
             ? BoardGenerator.Difficulty.fromText(args[1])
-            : BoardGenerator.Difficulty.NORMAL;
+            : BoardGenerator.Difficulty.EASY;
         BoardGenerator.Generated generated = args.length >= 3
-            ? BoardGenerator.generate(difficulty, Long.parseLong(args[2]), 5000)
+            ? BoardGenerator.generate(difficulty, Long.parseLong(args[2]))
             : BoardGenerator.generate(difficulty);
         Board board = generated.board();
         System.err.println("difficulty=" + difficulty.name().toLowerCase()
@@ -279,7 +279,7 @@ public final class PuzzleApp {
         if (selected instanceof BoardGenerator.Difficulty difficulty) {
             return difficulty;
         }
-        return BoardGenerator.Difficulty.NORMAL;
+        return BoardGenerator.Difficulty.EASY;
     }
 
     private void loadBoard(Board newBoard) {
