@@ -1,8 +1,8 @@
 @echo off
-setlocal
+setlocal EnableExtensions
 
-set SCRIPT_DIR=%~dp0
-set PROJECT_DIR=%SCRIPT_DIR%..
+set "SCRIPT_DIR=%~dp0"
+set "PROJECT_DIR=%SCRIPT_DIR%.."
 pushd "%PROJECT_DIR%" >nul 2>nul
 if errorlevel 1 (
     echo Failed to enter project directory: %PROJECT_DIR%
@@ -10,19 +10,24 @@ if errorlevel 1 (
     exit /b 1
 )
 
-set APP_NAME=Puzzle
-set MAIN_CLASS=puzzle.PuzzleApp
-set BUILD_DIR=build
-set CLASS_DIR=%BUILD_DIR%\classes
-set JAR_DIR=%BUILD_DIR%\jar
-set JAR_FILE=%APP_NAME%.jar
-set DIST_DIR=dist\windows
+set "APP_NAME=Puzzle"
+set "MAIN_CLASS=puzzle.PuzzleApp"
+set "BUILD_DIR=build"
+set "CLASS_DIR=%BUILD_DIR%\classes"
+set "JAR_DIR=%BUILD_DIR%\jar"
+set "JAR_FILE=%APP_NAME%.jar"
+set "DIST_DIR=dist\windows"
+set "APP_VERSION=0.2"
 
-call :resolve_jdk_tool javac JAVAC_CMD
+call :resolve_latest_jdk
 if errorlevel 1 goto fail
-call :resolve_jdk_tool jar JAR_CMD
-if errorlevel 1 goto fail
-call :resolve_jdk_tool jpackage JPACKAGE_CMD
+
+set "JAVAC_CMD=%JDK_HOME%\bin\javac.exe"
+set "JAR_CMD=%JDK_HOME%\bin\jar.exe"
+set "JPACKAGE_CMD=%JDK_HOME%\bin\jpackage.exe"
+
+echo Using JDK: %JDK_HOME%
+"%JAVAC_CMD%" -version
 if errorlevel 1 goto fail
 
 echo Cleaning previous build...
@@ -49,7 +54,7 @@ echo Creating Windows app image...
   --main-jar "%JAR_FILE%" ^
   --main-class "%MAIN_CLASS%" ^
   --dest "%DIST_DIR%" ^
-  --app-version 1.0 ^
+  --app-version "%APP_VERSION%" ^
   --vendor Puzzle
 if errorlevel 1 goto fail
 
@@ -61,60 +66,66 @@ popd >nul
 pause
 exit /b 0
 
-:resolve_jdk_tool
-set "%~2="
-call :try_tool_from_path %~1 %~2
-if defined %~2 exit /b 0
+:resolve_latest_jdk
+set "JDK_HOME="
+set "JDK_FIND_SCRIPT=%TEMP%\puzzle-find-latest-jdk-%RANDOM%.ps1"
+> "%JDK_FIND_SCRIPT%" echo $ErrorActionPreference = 'SilentlyContinue'
+>> "%JDK_FIND_SCRIPT%" echo $candidates = New-Object System.Collections.Generic.List[string]
+>> "%JDK_FIND_SCRIPT%" echo if ($env:JAVA_HOME) { $candidates.Add($env:JAVA_HOME) }
+>> "%JDK_FIND_SCRIPT%" echo foreach ($tool in @('javac.exe','jpackage.exe','java.exe')) {
+>> "%JDK_FIND_SCRIPT%" echo   foreach ($cmd in (Get-Command $tool -All ^| Where-Object { $_.Source })) {
+>> "%JDK_FIND_SCRIPT%" echo     $bin = Split-Path -Parent $cmd.Source
+>> "%JDK_FIND_SCRIPT%" echo     $home = Split-Path -Parent $bin
+>> "%JDK_FIND_SCRIPT%" echo     $candidates.Add($home)
+>> "%JDK_FIND_SCRIPT%" echo   }
+>> "%JDK_FIND_SCRIPT%" echo }
+>> "%JDK_FIND_SCRIPT%" echo foreach ($pattern in @(
+>> "%JDK_FIND_SCRIPT%" echo   'C:\Program Files\Java\jdk-*',
+>> "%JDK_FIND_SCRIPT%" echo   'C:\Program Files\Eclipse Adoptium\jdk-*',
+>> "%JDK_FIND_SCRIPT%" echo   'C:\Program Files\Microsoft\jdk-*',
+>> "%JDK_FIND_SCRIPT%" echo   'C:\Program Files\Amazon Corretto\jdk*',
+>> "%JDK_FIND_SCRIPT%" echo   'C:\Program Files\BellSoft\LibericaJDK-*',
+>> "%JDK_FIND_SCRIPT%" echo   'C:\Program Files\Zulu\zulu-*',
+>> "%JDK_FIND_SCRIPT%" echo   'C:\Program Files\Semeru\jdk-*'
+>> "%JDK_FIND_SCRIPT%" echo )) {
+>> "%JDK_FIND_SCRIPT%" echo   Get-ChildItem -Directory $pattern ^| ForEach-Object { $candidates.Add($_.FullName) }
+>> "%JDK_FIND_SCRIPT%" echo }
+>> "%JDK_FIND_SCRIPT%" echo $valid = foreach ($home in ($candidates ^| Where-Object { $_ } ^| Select-Object -Unique)) {
+>> "%JDK_FIND_SCRIPT%" echo   $release = Join-Path $home 'release'
+>> "%JDK_FIND_SCRIPT%" echo   $javac = Join-Path $home 'bin\javac.exe'
+>> "%JDK_FIND_SCRIPT%" echo   $jar = Join-Path $home 'bin\jar.exe'
+>> "%JDK_FIND_SCRIPT%" echo   $jpackage = Join-Path $home 'bin\jpackage.exe'
+>> "%JDK_FIND_SCRIPT%" echo   if (!(Test-Path $release) -or !(Test-Path $javac) -or !(Test-Path $jar) -or !(Test-Path $jpackage)) { continue }
+>> "%JDK_FIND_SCRIPT%" echo   $line = Select-String -Path $release -Pattern '^JAVA_VERSION=' ^| Select-Object -First 1
+>> "%JDK_FIND_SCRIPT%" echo   if (!$line) { continue }
+>> "%JDK_FIND_SCRIPT%" echo   $versionText = ($line.Line -replace '^JAVA_VERSION=','').Trim('"')
+>> "%JDK_FIND_SCRIPT%" echo   $majorText = ($versionText -split '[._+-]')[0]
+>> "%JDK_FIND_SCRIPT%" echo   $major = 0
+>> "%JDK_FIND_SCRIPT%" echo   if (![int]::TryParse($majorText, [ref]$major)) { continue }
+>> "%JDK_FIND_SCRIPT%" echo   if ($major -lt 17) { continue }
+>> "%JDK_FIND_SCRIPT%" echo   [pscustomobject]@{ Home = $home; Version = [version](($versionText -replace '[^0-9.]','.') -replace '\.+','.' -replace '^\.|\.$','') }
+>> "%JDK_FIND_SCRIPT%" echo }
+>> "%JDK_FIND_SCRIPT%" echo $best = $valid ^| Sort-Object Version, Home -Descending ^| Select-Object -First 1
+>> "%JDK_FIND_SCRIPT%" echo if ($best) { Write-Output $best.Home; exit 0 }
+>> "%JDK_FIND_SCRIPT%" echo exit 1
 
-call :try_tool_from_java_home %~1 %~2
-if defined %~2 exit /b 0
+for /f "usebackq delims=" %%J in (`powershell -NoProfile -ExecutionPolicy Bypass -File "%JDK_FIND_SCRIPT%"`) do (
+    set "JDK_HOME=%%J"
+)
+set "JDK_FIND_ERROR=%ERRORLEVEL%"
+if exist "%JDK_FIND_SCRIPT%" del "%JDK_FIND_SCRIPT%" >nul 2>nul
 
-call :try_tool_from_installed_jdks %~1 %~2
-if defined %~2 exit /b 0
-
-echo %~1 was not found in a JDK 17+ installation. Install JDK 17 or newer, or update PATH/JAVA_HOME.
-exit /b 1
-
-:try_tool_from_path
-for /f "delims=" %%I in ('where %~1 2^>nul') do (
-    call :is_java17_or_newer "%%~fI"
-    if not errorlevel 1 (
-        set "%~2=%%~fI"
-        exit /b 0
-    )
+if not "%JDK_FIND_ERROR%"=="0" (
+    echo No JDK 17+ with javac, jar, and jpackage was found.
+    echo Install the latest JDK 17 or newer, or update JAVA_HOME/PATH.
+    exit /b 1
+)
+if not defined JDK_HOME (
+    echo No JDK 17+ with javac, jar, and jpackage was found.
+    echo Install the latest JDK 17 or newer, or update JAVA_HOME/PATH.
+    exit /b 1
 )
 exit /b 0
-
-:try_tool_from_java_home
-if not defined JAVA_HOME exit /b 0
-call :try_explicit_tool "%JAVA_HOME%\bin\%~1.exe" %~2
-exit /b 0
-
-:try_tool_from_installed_jdks
-for /d %%D in ("C:\Program Files\Java\jdk-*") do (
-    call :try_explicit_tool "%%~fD\bin\%~1.exe" %~2
-    if defined %~2 exit /b 0
-)
-exit /b 0
-
-:try_explicit_tool
-if not exist "%~1" exit /b 0
-call :is_java17_or_newer "%~1"
-if errorlevel 1 exit /b 0
-set "%~2=%~1"
-exit /b 0
-
-:is_java17_or_newer
-set "CHECK_DIR=%~dp1..\"
-
-if exist "%CHECK_DIR%release" (
-    for /f "tokens=2 delims==" %%V in ('findstr /b "JAVA_VERSION=" "%CHECK_DIR%release" 2^>nul') do (
-        for /f "tokens=1 delims=." %%M in ("%%~V") do (
-            if %%M GEQ 17 exit /b 0
-        )
-    )
-)
-exit /b 1
 
 :fail
 echo.
