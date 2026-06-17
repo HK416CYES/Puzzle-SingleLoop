@@ -224,6 +224,9 @@ public final class BoardPanel extends JPanel {
         if (cell == -1 || !board.isWhite(board.rowOf(cell), board.colOf(cell))) {
             return;
         }
+        if (playerPath.containsCell(cell)) {
+            return;
+        }
         playerPath.reset();
         playerPath.addCell(cell);
         notifyPathChanged();

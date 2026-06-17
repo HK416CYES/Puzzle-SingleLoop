@@ -154,6 +154,16 @@ final class PlayerPath {
         return List.copyOf(cells);
     }
 
+    /**
+     * 判断格子是否已经在玩家路径中。
+     *
+     * @param cell 待检查的格子编号
+     * @return 如果格子已经位于路径中则返回 {@code true}
+     */
+    boolean containsCell(int cell) {
+        return cells.contains(cell);
+    }
+
     /** 执行 clearRedo 相关逻辑。 */
     private void clearRedo() {
         redoSteps.clear();
