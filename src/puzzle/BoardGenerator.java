@@ -24,8 +24,10 @@ public final class BoardGenerator {
     }
 
     /** 表示 DifficultyProfile 记录。 */
-    private record DifficultyProfile(int minBlacks, int maxBlacks, int minRowColumnRuns, int maxRepeatedRows,
-                                     int minJunctions, int minFullBlocks, int lowRiskChecks) {
+    private record DifficultyProfile(int minBlacks, int maxBlacks, int minWhites, int maxWhites,
+                                     int minRowColumnRuns, int maxRepeatedRows, int minJunctions,
+                                     int minFullBlocks, int maxForcedPercent, int lowRiskChecks,
+                                     long minFinalSolveNodes, int minAcceptanceAttempt) {
     }
 
     /** 表示 Ear 记录。 */
@@ -187,7 +189,9 @@ public final class BoardGenerator {
             Board board = Board.fromCells(ROWS, COLS, ring.white);
             CycleSolver.Result result = CycleSolver.solve(board, FINAL_SOLVER_LIMIT);
             solveNodes += result.nodes();
-            if (result.hasUniqueSolution()) {
+            if (result.hasUniqueSolution()
+                && result.nodes() >= profile.minFinalSolveNodes()
+                && attempt >= profile.minAcceptanceAttempt()) {
                 long elapsedMillis = (System.nanoTime() - started) / 1_000_000L;
                 return new Generated(board, result, seed, attempt, elapsedMillis, solveNodes);
             }
@@ -247,9 +251,9 @@ public final class BoardGenerator {
     /** 执行 profileFor 相关逻辑。 */
     private static DifficultyProfile profileFor(Difficulty difficulty) {
         return switch (difficulty) {
-            case EASY -> new DifficultyProfile(26, 38, 32, 3, 28, 6, 0);
-            case HARD -> new DifficultyProfile(16, 24, 28, 4, 48, 18, 60);
-            case HELL -> new DifficultyProfile(10, 16, 26, 4, 60, 30, 80);
+            case EASY -> new DifficultyProfile(28, 42, 58, 72, 30, 4, 18, 2, 90, 0, 0L, 1);
+            case HARD -> new DifficultyProfile(18, 26, 74, 82, 28, 4, 48, 18, 80, 70, 0L, 1);
+            case HELL -> new DifficultyProfile(10, 16, 84, 90, 26, 4, 60, 30, 78, 80, 0L, 200);
         };
     }
 
@@ -353,7 +357,7 @@ public final class BoardGenerator {
         boolean baseQuality = whites >= 12
             && (whites & 1) == 0
             && junctions >= profile.minJunctions()
-            && forced * 100 <= whites * 78
+            && forced * 100 <= whites * profile.maxForcedPercent()
             && full2x2 >= profile.minFullBlocks()
             && rowRuns + colRuns >= profile.minRowColumnRuns()
             && repeatedAdjacentRows <= profile.maxRepeatedRows()
@@ -361,11 +365,7 @@ public final class BoardGenerator {
             && blackCols >= 4
             && isWhiteConnected(cells);
 
-        return switch (difficulty) {
-            case EASY -> baseQuality && whites >= 62 && whites <= 74;
-            case HARD -> baseQuality && whites >= 76 && whites <= 84;
-            case HELL -> baseQuality && whites >= 84 && whites <= 90;
-        };
+        return baseQuality && whites >= profile.minWhites() && whites <= profile.maxWhites();
     }
 
     /** 执行 locallyValid 相关逻辑。 */
