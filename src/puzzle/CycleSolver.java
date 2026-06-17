@@ -4,34 +4,71 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+/**
+ * 使用深度优先搜索统计棋盘中的哈密顿环答案。
+ */
 public final class CycleSolver {
+    /**
+     * 表示求解器输出。
+     *
+     * @param solutionCount 已找到的答案数量，最多统计到两个
+     * @param aborted 是否因节点上限中止
+     * @param path 第一条答案路径
+     * @param nodes 搜索访问节点数
+     */
     public record Result(int solutionCount, boolean aborted, List<Integer> path, long nodes) {
+        /**
+         * 判断求解结果是否为唯一解。
+         *
+         * @return 如果存在且仅存在一个完整答案则返回 {@code true}
+         */
         public boolean hasUniqueSolution() {
             return !aborted && solutionCount == 1 && !path.isEmpty();
         }
     }
 
+    /** 保存 private。 */
     private final Board board;
+    /** 保存 private。 */
     private final int whiteCount;
+    /** 保存 private。 */
     private final int[] cellToId;
+    /** 保存 private。 */
     private final int[] idToCell;
+    /** 保存 private。 */
     private final int[][] adj;
+    /** 保存 private。 */
     private final int[] degree;
+    /** 保存 private。 */
     private final boolean[][] adjacent;
+    /** 保存 private。 */
     private final boolean[] used;
+    /** 保存 private。 */
     private final boolean[] seen;
+    /** 保存 private。 */
     private final int[] stack;
+    /** 保存 private。 */
     private final int[] path;
+    /** 保存 private。 */
     private final int[] firstSolution;
+    /** 保存 private。 */
     private final int[][] nextsByDepth;
+    /** 保存 private。 */
     private final long nodeLimit;
+    /** 保存 private。 */
     private int start;
+    /** 保存 private。 */
     private int pathLen;
+    /** 保存 private。 */
     private int solutionCount;
+    /** 保存 private。 */
     private int firstSolutionLen;
+    /** 保存 private。 */
     private long nodes;
+    /** 保存 private。 */
     private boolean aborted;
 
+    /** 创建 CycleSolver 实例。 */
     private CycleSolver(Board board, long nodeLimit) {
         this.board = board;
         this.nodeLimit = nodeLimit;
@@ -65,10 +102,18 @@ public final class CycleSolver {
         this.nextsByDepth = new int[Math.max(1, whiteCount)][4];
     }
 
+    /**
+     * 求解指定棋盘。
+     *
+     * @param board 待求解棋盘
+     * @param nodeLimit 搜索节点上限
+     * @return 求解结果
+     */
     public static Result solve(Board board, long nodeLimit) {
         return new CycleSolver(board, nodeLimit).solve();
     }
 
+    /** 执行 buildAdjacency 相关逻辑。 */
     private void buildAdjacency() {
         int[] dr = {-1, 1, 0, 0};
         int[] dc = {0, 0, -1, 1};
@@ -91,6 +136,13 @@ public final class CycleSolver {
         }
     }
 
+    /**
+     * 求解指定棋盘。
+     *
+     * @param board 待求解棋盘
+     * @param nodeLimit 搜索节点上限
+     * @return 求解结果
+     */
     private Result solve() {
         if (whiteCount < 4 || (whiteCount & 1) == 1 || !balancedBipartition()) {
             return result(0, false);
@@ -115,6 +167,7 @@ public final class CycleSolver {
         return result(solutionCount, aborted);
     }
 
+    /** 执行 balancedBipartition 相关逻辑。 */
     private boolean balancedBipartition() {
         int even = 0;
         int odd = 0;
@@ -129,6 +182,7 @@ public final class CycleSolver {
         return even == odd;
     }
 
+    /** 执行 result 相关逻辑。 */
     private Result result(int count, boolean isAborted) {
         ArrayList<Integer> cells = new ArrayList<>(firstSolutionLen);
         for (int i = 0; i < firstSolutionLen; i++) {
@@ -137,6 +191,7 @@ public final class CycleSolver {
         return new Result(count, isAborted, cells, nodes);
     }
 
+    /** 执行 dfs 相关逻辑。 */
     private void dfs(int cur, int usedCount) {
         if (++nodes > nodeLimit) {
             aborted = true;
@@ -184,6 +239,7 @@ public final class CycleSolver {
         }
     }
 
+    /** 执行 sortByOnwardOptions 相关逻辑。 */
     private void sortByOnwardOptions(int[] values, int count, int cur) {
         for (int i = 1; i < count; i++) {
             int value = values[i];
@@ -197,6 +253,7 @@ public final class CycleSolver {
         }
     }
 
+    /** 执行 stillPossible 相关逻辑。 */
     private boolean stillPossible(int cur, int usedCount) {
         int remaining = whiteCount - usedCount;
         if (remaining == 0) {
@@ -254,6 +311,7 @@ public final class CycleSolver {
         return true;
     }
 
+    /** 执行 onwardOptions 相关逻辑。 */
     private int onwardOptions(int vertex, int cur) {
         int options = 0;
         for (int i = 0; i < degree[vertex]; i++) {

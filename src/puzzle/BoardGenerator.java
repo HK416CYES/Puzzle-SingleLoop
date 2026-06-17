@@ -5,38 +5,77 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Random;
 
+/**
+ * 负责生成具有唯一哈密顿环答案的棋盘。
+ */
 public final class BoardGenerator {
+    /**
+     * 表示一次生成结果及其诊断信息。
+     *
+     * @param board 生成出的棋盘
+     * @param result 棋盘对应的求解结果
+     * @param seed 本次生成使用的随机种子
+     * @param attempts 生成尝试次数
+     * @param elapsedMillis 生成耗时，单位毫秒
+     * @param solveNodes 求解器访问节点数
+     */
     public record Generated(Board board, CycleSolver.Result result, long seed, int attempts,
                             long elapsedMillis, long solveNodes) {
     }
 
+    /** 表示 DifficultyProfile 记录。 */
     private record DifficultyProfile(int minBlacks, int maxBlacks, int minRowColumnRuns, int maxRepeatedRows,
                                      int minJunctions, int minFullBlocks, int lowRiskChecks) {
     }
 
+    /** 表示 Ear 记录。 */
     private record Ear(int edgeIndex, int a, int b) {
     }
 
+    /**
+     * 表示棋盘生成难度。
+     */
     public enum Difficulty {
+        /** 简单难度，白格较少且生成更快。 */
         EASY("简单"),
+        /** 困难难度，白格密度中高并引入低风险扩张。 */
         HARD("困难"),
+        /** 地狱难度，白格密度最高且分支更多。 */
         HELL("地狱");
 
+        /** 保存 private。 */
         private final String label;
 
+        /**
+         * 创建生成难度。
+         *
+         * @param label 中文显示名称
+         */
         Difficulty(String label) {
             this.label = label;
         }
 
+        /**
+         * 获取难度中文标签。
+         *
+         * @return 中文标签
+         */
         public String label() {
             return label;
         }
 
+        /** 执行 toString 相关逻辑。 */
         @Override
         public String toString() {
             return label;
         }
 
+        /**
+         * 根据命令行或界面文本解析难度。
+         *
+         * @param text 难度名称、中文标签或旧版别名
+         * @return 解析出的难度
+         */
         public static Difficulty fromText(String text) {
             String normalized = text == null ? "" : text.trim();
             if (normalized.equalsIgnoreCase("normal") || normalized.equals("普通")) {
@@ -54,34 +93,78 @@ public final class BoardGenerator {
         }
     }
 
+    /** 保存 private。 */
     private static final int ROWS = 10;
+    /** 保存 private。 */
     private static final int COLS = 10;
+    /** 保存 private。 */
     private static final long FINAL_SOLVER_LIMIT = 40_000_000L;
+    /** 保存 private。 */
     private static final long STEP_SOLVER_LIMIT = 1_000_000L;
 
+    /** 创建 BoardGenerator 实例。 */
     private BoardGenerator() {
     }
 
+    /**
+     * 使用默认简单难度生成棋盘。
+     *
+     * @return 生成结果
+     */
     public static Generated generate() {
         return generate(Difficulty.EASY);
     }
 
+    /**
+     * 使用指定难度和随机种子生成棋盘。
+     *
+     * @param difficulty 生成难度
+     * @return 生成结果
+     */
     public static Generated generate(Difficulty difficulty) {
         return generate(difficulty, System.nanoTime(), defaultMaxAttempts(difficulty));
     }
 
+    /**
+     * 使用指定难度和固定种子生成棋盘。
+     *
+     * @param difficulty 生成难度
+     * @param seed 随机种子
+     * @return 生成结果
+     */
     public static Generated generate(Difficulty difficulty, long seed) {
         return generate(difficulty, seed, defaultMaxAttempts(difficulty));
     }
 
+    /**
+     * 使用默认简单难度、固定种子和尝试上限生成棋盘。
+     *
+     * @param seed 随机种子
+     * @param maxAttempts 最大尝试次数
+     * @return 生成结果
+     */
     public static Generated generate(long seed, int maxAttempts) {
         return generate(Difficulty.EASY, seed, maxAttempts);
     }
 
+    /**
+     * 获取指定难度的默认最大尝试次数。
+     *
+     * @param difficulty 生成难度
+     * @return 默认最大尝试次数
+     */
     public static int defaultMaxAttempts(Difficulty difficulty) {
         return difficulty == Difficulty.HELL ? 9000 : 5000;
     }
 
+    /**
+     * 使用完整参数生成棋盘。
+     *
+     * @param difficulty 生成难度
+     * @param seed 随机种子
+     * @param maxAttempts 最大尝试次数
+     * @return 生成结果
+     */
     public static Generated generate(Difficulty difficulty, long seed, int maxAttempts) {
         long started = System.nanoTime();
         Random random = new Random(seed);
@@ -113,6 +196,7 @@ public final class BoardGenerator {
         throw new IllegalStateException("没有生成唯一解棋盘，请重试");
     }
 
+    /** 执行 growForced 相关逻辑。 */
     private static void growForced(RingBoard ring, int targetWhites, Random random) {
         while (ring.whiteCount() < targetWhites) {
             List<Ear> ears = ring.collectEars(true);
@@ -123,6 +207,7 @@ public final class BoardGenerator {
         }
     }
 
+    /** 执行 growWithLowRiskSteps 相关逻辑。 */
     private static long growWithLowRiskSteps(RingBoard ring, int targetWhites, Random random, int maxChecksPerStep) {
         long solveNodes = 0;
         while (ring.whiteCount() < targetWhites) {
@@ -159,6 +244,7 @@ public final class BoardGenerator {
         return solveNodes;
     }
 
+    /** 执行 profileFor 相关逻辑。 */
     private static DifficultyProfile profileFor(Difficulty difficulty) {
         return switch (difficulty) {
             case EASY -> new DifficultyProfile(26, 38, 32, 3, 28, 6, 0);
@@ -167,12 +253,14 @@ public final class BoardGenerator {
         };
     }
 
+    /** 执行 evenBetween 相关逻辑。 */
     private static int evenBetween(Random random, int minInclusive, int maxInclusive) {
         int min = minInclusive + (minInclusive & 1);
         int max = maxInclusive - (maxInclusive & 1);
         return min + random.nextInt((max - min) / 2 + 1) * 2;
     }
 
+    /** 执行 qualityOk 相关逻辑。 */
     private static boolean qualityOk(boolean[] cells, Difficulty difficulty) {
         DifficultyProfile profile = profileFor(difficulty);
         int whites = 0;
@@ -280,6 +368,7 @@ public final class BoardGenerator {
         };
     }
 
+    /** 执行 locallyValid 相关逻辑。 */
     private static boolean locallyValid(boolean[] cells) {
         for (int i = 0; i < cells.length; i++) {
             if (cells[i] && degree(cells, i) < 2) {
@@ -289,6 +378,7 @@ public final class BoardGenerator {
         return isWhiteConnected(cells);
     }
 
+    /** 执行 isWhiteConnected 相关逻辑。 */
     private static boolean isWhiteConnected(boolean[] cells) {
         int start = -1;
         int whites = 0;
@@ -323,6 +413,7 @@ public final class BoardGenerator {
         return reached == whites;
     }
 
+    /** 执行 pushIfWhite 相关逻辑。 */
     private static int pushIfWhite(boolean[] cells, boolean[] seen, int[] stack, int stackSize, int row, int col) {
         if (row < 0 || row >= ROWS || col < 0 || col >= COLS) {
             return stackSize;
@@ -336,6 +427,7 @@ public final class BoardGenerator {
         return stackSize;
     }
 
+    /** 执行 degree 相关逻辑。 */
     private static int degree(boolean[] cells, int cell) {
         int deg = 0;
         int row = cell / COLS;
@@ -355,15 +447,21 @@ public final class BoardGenerator {
         return deg;
     }
 
+    /** 执行 index 相关逻辑。 */
     private static int index(int row, int col) {
         return row * COLS + col;
     }
 
+    /** 表示 RingBoard 类。 */
     private static final class RingBoard {
+        /** 保存 private。 */
         private boolean[] white;
+        /** 保存 private。 */
         private final ArrayList<Integer> path = new ArrayList<>();
+        /** 保存 private。 */
         private final int[] pathIndex = new int[ROWS * COLS];
 
+        /** 创建 RingBoard 实例。 */
         private RingBoard(int startRow, int startCol) {
             white = new boolean[ROWS * COLS];
             int a = index(startRow, startCol);
@@ -378,14 +476,17 @@ public final class BoardGenerator {
             rebuildPathIndex();
         }
 
+        /** 执行 randomSeed 相关逻辑。 */
         private static RingBoard randomSeed(Random random) {
             return new RingBoard(random.nextInt(ROWS - 1), random.nextInt(COLS - 1));
         }
 
+        /** 执行 whiteCount 相关逻辑。 */
         private int whiteCount() {
             return path.size();
         }
 
+        /** 执行 collectEars 相关逻辑。 */
         private List<Ear> collectEars(boolean forcedOnly) {
             ArrayList<Ear> ears = new ArrayList<>();
             for (int i = 0; i < path.size(); i++) {
@@ -396,6 +497,7 @@ public final class BoardGenerator {
             return ears;
         }
 
+        /** 执行 addEarsForEdge 相关逻辑。 */
         private void addEarsForEdge(List<Ear> ears, int edgeIndex, int a, int b, boolean forcedOnly) {
             int ar = a / COLS;
             int ac = a % COLS;
@@ -411,6 +513,7 @@ public final class BoardGenerator {
             }
         }
 
+        /** 执行 addEar 相关逻辑。 */
         private void addEar(List<Ear> ears, int edgeIndex, int ar, int ac, int br, int bc, boolean forcedOnly) {
             if (ar < 0 || ar >= ROWS || ac < 0 || ac >= COLS
                 || br < 0 || br >= ROWS || bc < 0 || bc >= COLS) {
@@ -433,6 +536,7 @@ public final class BoardGenerator {
             }
         }
 
+        /** 执行 copyWith 相关逻辑。 */
         private boolean[] copyWith(Ear ear) {
             boolean[] next = white.clone();
             next[ear.a()] = true;
@@ -440,18 +544,21 @@ public final class BoardGenerator {
             return next;
         }
 
+        /** 执行 apply 相关逻辑。 */
         private void apply(Ear ear) {
             white[ear.a()] = true;
             white[ear.b()] = true;
             insertPathCells(ear);
         }
 
+        /** 执行 setPath 相关逻辑。 */
         private void setPath(List<Integer> cells) {
             path.clear();
             path.addAll(cells);
             rebuildPathIndex();
         }
 
+        /** 执行 insertPathCells 相关逻辑。 */
         private void insertPathCells(Ear ear) {
             int insertAt = ear.edgeIndex() + 1;
             if (insertAt >= path.size()) {
@@ -464,6 +571,7 @@ public final class BoardGenerator {
             rebuildPathIndex();
         }
 
+        /** 执行 rebuildPathIndex 相关逻辑。 */
         private void rebuildPathIndex() {
             for (int i = 0; i < pathIndex.length; i++) {
                 pathIndex[i] = -1;
