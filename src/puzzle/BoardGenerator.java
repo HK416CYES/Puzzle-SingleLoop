@@ -5,9 +5,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Random;
 
-/**
- * 负责生成具有唯一哈密顿环答案的棋盘。
- */
+/** { 对应的内部状态。 */
 public final class BoardGenerator {
     /**
      * 表示一次生成结果及其诊断信息。
@@ -23,20 +21,39 @@ public final class BoardGenerator {
                             long elapsedMillis, long solveNodes) {
     }
 
-    /** 表示 DifficultyProfile 记录。 */
+    /**
+     * 保存单个难度的生成阈值。
+     *
+     * @param minBlacks 目标黑格数量下限
+     * @param maxBlacks 目标黑格数量上限
+     * @param minWhites 可接受白格数量下限
+     * @param maxWhites 可接受白格数量上限
+     * @param minRowColumnRuns 行列白格片段数量下限
+     * @param maxRepeatedRows 相邻重复行数量上限
+     * @param minJunctions 分支白格数量下限
+     * @param minFullBlocks 全白二乘二块数量下限
+     * @param maxForcedPercent 二度白格比例上限
+     * @param lowRiskChecks 每步低风险扩张候选检查上限
+     * @param minFinalSolveNodes 最终求解节点数下限
+     * @param minAcceptanceAttempt 允许接受答案的最小尝试次数
+     */
     private record DifficultyProfile(int minBlacks, int maxBlacks, int minWhites, int maxWhites,
                                      int minRowColumnRuns, int maxRepeatedRows, int minJunctions,
                                      int minFullBlocks, int maxForcedPercent, int lowRiskChecks,
                                      long minFinalSolveNodes, int minAcceptanceAttempt) {
     }
 
-    /** 表示 Ear 记录。 */
+    /**
+     * 表示把答案环上一条边替换成两个新格子的耳扩张。
+     *
+     * @param edgeIndex 答案环边的位置。
+     * @param a 第一个格子或顶点。
+     * @param b 第二个格子或顶点。
+     */
     private record Ear(int edgeIndex, int a, int b) {
     }
 
-    /**
-     * 表示棋盘生成难度。
-     */
+    /** { 对应的内部状态。 */
     public enum Difficulty {
         /** 简单难度，白格较少且生成更快。 */
         EASY("简单"),
@@ -45,7 +62,7 @@ public final class BoardGenerator {
         /** 地狱难度，白格密度最高且分支更多。 */
         HELL("地狱");
 
-        /** 保存 private。 */
+        /** 难度中文显示名称。 */
         private final String label;
 
         /**
@@ -66,7 +83,11 @@ public final class BoardGenerator {
             return label;
         }
 
-        /** 执行 toString 相关逻辑。 */
+        /**
+         * 返回适合界面显示的中文名称。
+         *
+         * @return 中文显示名称。
+         */
         @Override
         public String toString() {
             return label;
@@ -95,13 +116,13 @@ public final class BoardGenerator {
         }
     }
 
-    /** 保存 private。 */
+    /** 生成器固定棋盘行数。 */
     private static final int ROWS = 10;
-    /** 保存 private。 */
+    /** 生成器固定棋盘列数。 */
     private static final int COLS = 10;
-    /** 保存 private。 */
+    /** 最终唯一性验证的搜索节点上限。 */
     private static final long FINAL_SOLVER_LIMIT = 40_000_000L;
-    /** 保存 private。 */
+    /** 低风险扩张试探的搜索节点上限。 */
     private static final long STEP_SOLVER_LIMIT = 1_000_000L;
 
     /** 创建 BoardGenerator 实例。 */
@@ -200,7 +221,13 @@ public final class BoardGenerator {
         throw new IllegalStateException("没有生成唯一解棋盘，请重试");
     }
 
-    /** 执行 growForced 相关逻辑。 */
+    /**
+     * 用强制扩张尽量扩展答案环。
+     *
+     * @param ring 正在生长的答案环状态。
+     * @param targetWhites 目标白格数量。
+     * @param random 随机数生成器。
+     */
     private static void growForced(RingBoard ring, int targetWhites, Random random) {
         while (ring.whiteCount() < targetWhites) {
             List<Ear> ears = ring.collectEars(true);
@@ -211,7 +238,15 @@ public final class BoardGenerator {
         }
     }
 
-    /** 执行 growWithLowRiskSteps 相关逻辑。 */
+    /**
+     * 使用带局部验证的低风险扩张继续扩展答案环。
+     *
+     * @param ring 正在生长的答案环状态。
+     * @param targetWhites 目标白格数量。
+     * @param random 随机数生成器。
+     * @param maxChecksPerStep 每一步低风险扩张最多检查的候选数量。
+     * @return 低风险扩张消耗的求解节点数。
+     */
     private static long growWithLowRiskSteps(RingBoard ring, int targetWhites, Random random, int maxChecksPerStep) {
         long solveNodes = 0;
         while (ring.whiteCount() < targetWhites) {
@@ -248,7 +283,12 @@ public final class BoardGenerator {
         return solveNodes;
     }
 
-    /** 执行 profileFor 相关逻辑。 */
+    /**
+     * 返回指定难度的生成参数。
+     *
+     * @param difficulty 生成难度。
+     * @return 难度生成参数。
+     */
     private static DifficultyProfile profileFor(Difficulty difficulty) {
         return switch (difficulty) {
             case EASY -> new DifficultyProfile(28, 42, 58, 72, 30, 4, 18, 2, 90, 0, 0L, 1);
@@ -257,14 +297,27 @@ public final class BoardGenerator {
         };
     }
 
-    /** 执行 evenBetween 相关逻辑。 */
+    /**
+     * 在闭区间中生成随机偶数。
+     *
+     * @param random 随机数生成器。
+     * @param minInclusive 闭区间最小值。
+     * @param maxInclusive 闭区间最大值。
+     * @return 随机偶数。
+     */
     private static int evenBetween(Random random, int minInclusive, int maxInclusive) {
         int min = minInclusive + (minInclusive & 1);
         int max = maxInclusive - (maxInclusive & 1);
         return min + random.nextInt((max - min) / 2 + 1) * 2;
     }
 
-    /** 执行 qualityOk 相关逻辑。 */
+    /**
+     * 检查候选棋盘是否满足难度质量要求。
+     *
+     * @param cells 格子状态或路径列表。
+     * @param difficulty 生成难度。
+     * @return 如果候选棋盘满足质量要求则返回 true。
+     */
     private static boolean qualityOk(boolean[] cells, Difficulty difficulty) {
         DifficultyProfile profile = profileFor(difficulty);
         int whites = 0;
@@ -368,7 +421,12 @@ public final class BoardGenerator {
         return baseQuality && whites >= profile.minWhites() && whites <= profile.maxWhites();
     }
 
-    /** 执行 locallyValid 相关逻辑。 */
+    /**
+     * 检查低风险扩张后的局部合法性。
+     *
+     * @param cells 格子状态或路径列表。
+     * @return 如果局部状态合法则返回 true。
+     */
     private static boolean locallyValid(boolean[] cells) {
         for (int i = 0; i < cells.length; i++) {
             if (cells[i] && degree(cells, i) < 2) {
@@ -378,7 +436,12 @@ public final class BoardGenerator {
         return isWhiteConnected(cells);
     }
 
-    /** 执行 isWhiteConnected 相关逻辑。 */
+    /**
+     * 检查所有白格是否连通。
+     *
+     * @param cells 格子状态或路径列表。
+     * @return 如果所有白格连通则返回 true。
+     */
     private static boolean isWhiteConnected(boolean[] cells) {
         int start = -1;
         int whites = 0;
@@ -413,7 +476,17 @@ public final class BoardGenerator {
         return reached == whites;
     }
 
-    /** 执行 pushIfWhite 相关逻辑。 */
+    /**
+     * 在连通性搜索中压入未访问白格。
+     *
+     * @param cells 格子状态或路径列表。
+     * @param seen 访问标记数组。
+     * @param stack 搜索栈。
+     * @param stackSize 当前栈大小。
+     * @param row 行号。
+     * @param col 列号。
+     * @return 更新后的栈大小。
+     */
     private static int pushIfWhite(boolean[] cells, boolean[] seen, int[] stack, int stackSize, int row, int col) {
         if (row < 0 || row >= ROWS || col < 0 || col >= COLS) {
             return stackSize;
@@ -427,7 +500,13 @@ public final class BoardGenerator {
         return stackSize;
     }
 
-    /** 执行 degree 相关逻辑。 */
+    /**
+     * 计算格子的白格邻居数量。
+     *
+     * @param cells 格子状态或路径列表。
+     * @param cell 格子编号。
+     * @return 白格邻居数量。
+     */
     private static int degree(boolean[] cells, int cell) {
         int deg = 0;
         int row = cell / COLS;
@@ -447,21 +526,32 @@ public final class BoardGenerator {
         return deg;
     }
 
-    /** 执行 index 相关逻辑。 */
+    /**
+     * 将行列坐标转换为一维数组下标。
+     *
+     * @param row 行号。
+     * @param col 列号。
+     * @return 一维数组下标。
+     */
     private static int index(int row, int col) {
         return row * COLS + col;
     }
 
-    /** 表示 RingBoard 类。 */
+    /** { 对应的内部状态。 */
     private static final class RingBoard {
-        /** 保存 private。 */
+        /** 按行优先保存白格状态。 */
         private boolean[] white;
-        /** 保存 private。 */
+        /** 当前已知答案环路径。 */
         private final ArrayList<Integer> path = new ArrayList<>();
-        /** 保存 private。 */
+        /** 格子到答案环位置的映射。 */
         private final int[] pathIndex = new int[ROWS * COLS];
 
-        /** 创建 RingBoard 实例。 */
+        /**
+         * 创建 RingBoard 实例。
+         *
+         * @param startRow 初始二乘二白块左上角行号。
+         * @param startCol 初始二乘二白块左上角列号。
+         */
         private RingBoard(int startRow, int startCol) {
             white = new boolean[ROWS * COLS];
             int a = index(startRow, startCol);
@@ -476,17 +566,31 @@ public final class BoardGenerator {
             rebuildPathIndex();
         }
 
-        /** 执行 randomSeed 相关逻辑。 */
+        /**
+         * 随机创建初始二乘二白格环。
+         *
+         * @param random 随机数生成器。
+         * @return 初始答案环状态。
+         */
         private static RingBoard randomSeed(Random random) {
             return new RingBoard(random.nextInt(ROWS - 1), random.nextInt(COLS - 1));
         }
 
-        /** 执行 whiteCount 相关逻辑。 */
+        /**
+         * 返回当前环上的白格数量。
+         *
+         * @return 白格数量。
+         */
         private int whiteCount() {
             return path.size();
         }
 
-        /** 执行 collectEars 相关逻辑。 */
+        /**
+         * 收集当前答案环可用的耳扩张候选。
+         *
+         * @param forcedOnly forcedOnly 参数。
+         * @return 耳扩张候选列表。
+         */
         private List<Ear> collectEars(boolean forcedOnly) {
             ArrayList<Ear> ears = new ArrayList<>();
             for (int i = 0; i < path.size(); i++) {
@@ -497,7 +601,15 @@ public final class BoardGenerator {
             return ears;
         }
 
-        /** 执行 addEarsForEdge 相关逻辑。 */
+        /**
+         * 为答案环上的一条边收集耳扩张。
+         *
+         * @param ears 耳扩张候选列表。
+         * @param edgeIndex 答案环边的位置。
+         * @param a 第一个格子或顶点。
+         * @param b 第二个格子或顶点。
+         * @param forcedOnly forcedOnly 参数。
+         */
         private void addEarsForEdge(List<Ear> ears, int edgeIndex, int a, int b, boolean forcedOnly) {
             int ar = a / COLS;
             int ac = a % COLS;
@@ -513,7 +625,17 @@ public final class BoardGenerator {
             }
         }
 
-        /** 执行 addEar 相关逻辑。 */
+        /**
+         * 尝试加入一个耳扩张候选。
+         *
+         * @param ears 耳扩张候选列表。
+         * @param edgeIndex 答案环边的位置。
+         * @param ar 第一个新格子的行号。
+         * @param ac 第一个新格子的列号。
+         * @param br 第二个新格子的行号。
+         * @param bc 第二个新格子的列号。
+         * @param forcedOnly forcedOnly 参数。
+         */
         private void addEar(List<Ear> ears, int edgeIndex, int ar, int ac, int br, int bc, boolean forcedOnly) {
             if (ar < 0 || ar >= ROWS || ac < 0 || ac >= COLS
                 || br < 0 || br >= ROWS || bc < 0 || bc >= COLS) {
@@ -536,7 +658,12 @@ public final class BoardGenerator {
             }
         }
 
-        /** 执行 copyWith 相关逻辑。 */
+        /**
+         * 复制白格状态并加入指定耳扩张。
+         *
+         * @param ear 耳扩张候选。
+         * @return 加入候选后的白格状态副本。
+         */
         private boolean[] copyWith(Ear ear) {
             boolean[] next = white.clone();
             next[ear.a()] = true;
@@ -544,21 +671,33 @@ public final class BoardGenerator {
             return next;
         }
 
-        /** 执行 apply 相关逻辑。 */
+        /**
+         * 把耳扩张应用到当前环。
+         *
+         * @param ear 耳扩张候选。
+         */
         private void apply(Ear ear) {
             white[ear.a()] = true;
             white[ear.b()] = true;
             insertPathCells(ear);
         }
 
-        /** 执行 setPath 相关逻辑。 */
+        /**
+         * 用求解器返回的路径替换当前答案环。
+         *
+         * @param cells 格子状态或路径列表。
+         */
         private void setPath(List<Integer> cells) {
             path.clear();
             path.addAll(cells);
             rebuildPathIndex();
         }
 
-        /** 执行 insertPathCells 相关逻辑。 */
+        /**
+         * 把耳扩张的新格子插入答案环路径。
+         *
+         * @param ear 耳扩张候选。
+         */
         private void insertPathCells(Ear ear) {
             int insertAt = ear.edgeIndex() + 1;
             if (insertAt >= path.size()) {
@@ -571,7 +710,7 @@ public final class BoardGenerator {
             rebuildPathIndex();
         }
 
-        /** 执行 rebuildPathIndex 相关逻辑。 */
+        /** 重建格子到答案环位置的映射。 */
         private void rebuildPathIndex() {
             for (int i = 0; i < pathIndex.length; i++) {
                 pathIndex[i] = -1;

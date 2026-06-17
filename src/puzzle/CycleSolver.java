@@ -4,9 +4,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-/**
- * 使用深度优先搜索统计棋盘中的哈密顿环答案。
- */
+/** { 对应的内部状态。 */
 public final class CycleSolver {
     /**
      * 表示求解器输出。
@@ -27,48 +25,53 @@ public final class CycleSolver {
         }
     }
 
-    /** 保存 private。 */
+    /** 当前棋盘。 */
     private final Board board;
-    /** 保存 private。 */
+    /** 白格总数。 */
     private final int whiteCount;
-    /** 保存 private。 */
+    /** 棋盘格子编号到白格顶点编号的映射。 */
     private final int[] cellToId;
-    /** 保存 private。 */
+    /** 白格顶点编号到棋盘格子编号的映射。 */
     private final int[] idToCell;
-    /** 保存 private。 */
+    /** 白格邻接表。 */
     private final int[][] adj;
-    /** 保存 private。 */
+    /** 每个白格顶点的邻接数量。 */
     private final int[] degree;
-    /** 保存 private。 */
+    /** 白格顶点是否相邻的快速查询表。 */
     private final boolean[][] adjacent;
-    /** 保存 private。 */
+    /** 搜索中已经使用的顶点标记。 */
     private final boolean[] used;
-    /** 保存 private。 */
+    /** 连通性剪枝复用的访问标记。 */
     private final boolean[] seen;
-    /** 保存 private。 */
+    /** 连通性剪枝复用的栈。 */
     private final int[] stack;
-    /** 保存 private。 */
+    /** 当前已知答案环路径。 */
     private final int[] path;
-    /** 保存 private。 */
+    /** 第一条完整答案路径。 */
     private final int[] firstSolution;
-    /** 保存 private。 */
+    /** 每一层 DFS 复用的候选邻居缓冲区。 */
     private final int[][] nextsByDepth;
-    /** 保存 private。 */
+    /** 搜索节点上限。 */
     private final long nodeLimit;
-    /** 保存 private。 */
+    /** DFS 固定起点。 */
     private int start;
-    /** 保存 private。 */
+    /** 当前 DFS 路径长度。 */
     private int pathLen;
-    /** 保存 private。 */
+    /** 已经找到的答案数量。 */
     private int solutionCount;
-    /** 保存 private。 */
+    /** 第一条答案路径长度。 */
     private int firstSolutionLen;
-    /** 保存 private。 */
+    /** 已经访问的搜索节点数。 */
     private long nodes;
-    /** 保存 private。 */
+    /** 是否因为超过节点上限而中止。 */
     private boolean aborted;
 
-    /** 创建 CycleSolver 实例。 */
+    /**
+     * 创建 CycleSolver 实例。
+     *
+     * @param board 棋盘对象。
+     * @param nodeLimit 搜索节点上限。
+     */
     private CycleSolver(Board board, long nodeLimit) {
         this.board = board;
         this.nodeLimit = nodeLimit;
@@ -113,7 +116,7 @@ public final class CycleSolver {
         return new CycleSolver(board, nodeLimit).solve();
     }
 
-    /** 执行 buildAdjacency 相关逻辑。 */
+    /** 为所有白格顶点建立四方向邻接关系。 */
     private void buildAdjacency() {
         int[] dr = {-1, 1, 0, 0};
         int[] dc = {0, 0, -1, 1};
@@ -137,10 +140,8 @@ public final class CycleSolver {
     }
 
     /**
-     * 求解指定棋盘。
+     * 执行当前求解器实例的搜索流程。
      *
-     * @param board 待求解棋盘
-     * @param nodeLimit 搜索节点上限
      * @return 求解结果
      */
     private Result solve() {
@@ -167,7 +168,11 @@ public final class CycleSolver {
         return result(solutionCount, aborted);
     }
 
-    /** 执行 balancedBipartition 相关逻辑。 */
+    /**
+     * 检查白格在棋盘二分染色中的数量是否平衡。
+     *
+     * @return 如果两种棋盘染色上的白格数量相等则返回 true。
+     */
     private boolean balancedBipartition() {
         int even = 0;
         int odd = 0;
@@ -182,7 +187,13 @@ public final class CycleSolver {
         return even == odd;
     }
 
-    /** 执行 result 相关逻辑。 */
+    /**
+     * 构造求解结果对象。
+     *
+     * @param count 答案数量。
+     * @param isAborted 是否中止。
+     * @return 求解结果。
+     */
     private Result result(int count, boolean isAborted) {
         ArrayList<Integer> cells = new ArrayList<>(firstSolutionLen);
         for (int i = 0; i < firstSolutionLen; i++) {
@@ -191,7 +202,12 @@ public final class CycleSolver {
         return new Result(count, isAborted, cells, nodes);
     }
 
-    /** 执行 dfs 相关逻辑。 */
+    /**
+     * 从当前顶点继续深度优先搜索哈密顿环。
+     *
+     * @param cur 当前顶点。
+     * @param usedCount 已经使用的顶点数量。
+     */
     private void dfs(int cur, int usedCount) {
         if (++nodes > nodeLimit) {
             aborted = true;
@@ -239,7 +255,13 @@ public final class CycleSolver {
         }
     }
 
-    /** 执行 sortByOnwardOptions 相关逻辑。 */
+    /**
+     * 按后续可选数量对候选邻居排序。
+     *
+     * @param values 待排序的候选顶点数组。
+     * @param count 答案数量。
+     * @param cur 当前顶点。
+     */
     private void sortByOnwardOptions(int[] values, int count, int cur) {
         for (int i = 1; i < count; i++) {
             int value = values[i];
@@ -253,7 +275,13 @@ public final class CycleSolver {
         }
     }
 
-    /** 执行 stillPossible 相关逻辑。 */
+    /**
+     * 检查当前 DFS 状态是否仍可能完成环。
+     *
+     * @param cur 当前顶点。
+     * @param usedCount 已经使用的顶点数量。
+     * @return 如果当前搜索状态仍可能完成答案环则返回 true。
+     */
     private boolean stillPossible(int cur, int usedCount) {
         int remaining = whiteCount - usedCount;
         if (remaining == 0) {
@@ -311,7 +339,13 @@ public final class CycleSolver {
         return true;
     }
 
-    /** 执行 onwardOptions 相关逻辑。 */
+    /**
+     * 计算顶点在当前搜索状态下的后续选择数量。
+     *
+     * @param vertex 顶点编号。
+     * @param cur 当前顶点。
+     * @return 后续可选顶点数量。
+     */
     private int onwardOptions(int vertex, int cur) {
         int options = 0;
         for (int i = 0; i < degree[vertex]; i++) {

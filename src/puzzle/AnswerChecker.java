@@ -34,7 +34,13 @@ final class AnswerChecker {
         return sameCycle(playerPath, answerPath);
     }
 
-    /** 执行 containsEachWhiteOnce 相关逻辑。 */
+    /**
+     * 检查路径是否恰好覆盖每个白格一次。
+     *
+     * @param board 棋盘对象。
+     * @param path 文件路径或格子路径。
+     * @return 如果路径恰好覆盖每个白格一次则返回 true。
+     */
     private static boolean containsEachWhiteOnce(Board board, List<Integer> path) {
         Set<Integer> seen = new HashSet<>();
         for (int cell : path) {
@@ -48,7 +54,13 @@ final class AnswerChecker {
         return seen.size() == board.whiteCount();
     }
 
-    /** 执行 sameCycle 相关逻辑。 */
+    /**
+     * 比较两条路径是否为同一个环。
+     *
+     * @param playerPath 玩家路径。
+     * @param answerPath 标准答案路径。
+     * @return 如果两条路径环等价则返回 true。
+     */
     private static boolean sameCycle(List<Integer> playerPath, List<Integer> answerPath) {
         int size = answerPath.size();
         int first = playerPath.get(0);
@@ -64,7 +76,15 @@ final class AnswerChecker {
         return false;
     }
 
-    /** 执行 matchesDirection 相关逻辑。 */
+    /**
+     * 按指定方向比较玩家路径和标准答案。
+     *
+     * @param playerPath 玩家路径。
+     * @param answerPath 标准答案路径。
+     * @param offset 标准答案中的起始偏移。
+     * @param direction 比较方向。
+     * @return 如果指定方向上完全匹配则返回 true。
+     */
     private static boolean matchesDirection(List<Integer> playerPath, List<Integer> answerPath, int offset, int direction) {
         int size = answerPath.size();
         for (int i = 0; i < size; i++) {

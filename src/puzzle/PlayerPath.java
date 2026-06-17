@@ -8,13 +8,13 @@ import java.util.List;
  * 管理玩家当前绘制的路径以及撤销、重做状态。
  */
 final class PlayerPath {
-    /** 保存 private。 */
+    /** 当前棋盘。 */
     private final Board board;
-    /** 保存 private。 */
+    /** 玩家路径中的格子序列。 */
     private final ArrayList<Integer> cells = new ArrayList<>();
-    /** 保存 private。 */
+    /** 撤销后可重做的步骤栈。 */
     private final ArrayDeque<RedoStep> redoSteps = new ArrayDeque<>();
-    /** 保存 private。 */
+    /** 玩家路径是否已经闭环。 */
     private boolean closed;
 
     /**
@@ -164,12 +164,17 @@ final class PlayerPath {
         return cells.contains(cell);
     }
 
-    /** 执行 clearRedo 相关逻辑。 */
+    /** 清空玩家路径的重做历史。 */
     private void clearRedo() {
         redoSteps.clear();
     }
 
-    /** 执行 isWhiteCell 相关逻辑。 */
+    /**
+     * 判断格子是否是当前棋盘中的白格。
+     *
+     * @param cell 格子编号。
+     * @return 如果该格子是白格则返回 true。
+     */
     private boolean isWhiteCell(int cell) {
         if (cell < 0 || cell >= board.rows() * board.cols()) {
             return false;
@@ -177,21 +182,41 @@ final class PlayerPath {
         return board.isWhite(board.rowOf(cell), board.colOf(cell));
     }
 
-    /** 执行 isAdjacent 相关逻辑。 */
+    /**
+     * 判断两个格子是否四方向相邻。
+     *
+     * @param a 第一个格子或顶点。
+     * @param b 第二个格子或顶点。
+     * @return 如果两个格子四方向相邻则返回 true。
+     */
     private boolean isAdjacent(int a, int b) {
         int dr = Math.abs(board.rowOf(a) - board.rowOf(b));
         int dc = Math.abs(board.colOf(a) - board.colOf(b));
         return dr + dc == 1;
     }
 
-    /** 表示 RedoStep 记录。 */
+    /**
+     * 表示一次可以重做的玩家路径操作。
+     *
+     * @param cell 格子编号。
+     * @param closure closure 参数。
+     */
     private record RedoStep(int cell, boolean closure) {
-        /** 执行 cell 相关逻辑。 */
+        /**
+         * 创建表示恢复格子的重做步骤。
+         *
+         * @param cell 格子编号。
+         * @return 重做步骤。
+         */
         private static RedoStep cell(int cell) {
             return new RedoStep(cell, false);
         }
 
-        /** 执行 closingStep 相关逻辑。 */
+        /**
+         * 创建表示恢复闭环的重做步骤。
+         *
+         * @return 重做闭环步骤。
+         */
         private static RedoStep closingStep() {
             return new RedoStep(-1, true);
         }

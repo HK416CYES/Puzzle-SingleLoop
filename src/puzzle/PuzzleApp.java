@@ -19,39 +19,37 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 
-/**
- * 黑白环形连线谜题的 Swing 应用入口。
- */
+/** { 对应的内部状态。 */
 public final class PuzzleApp {
-    /** 保存 private。 */
+    /** SOLVER_NODE_LIMIT 对应的内部状态。 */
     private static final long SOLVER_NODE_LIMIT = 40_000_000L;
 
-    /** 保存 private。 */
+    /** 应用主窗口。 */
     private final JFrame frame = new JFrame("Black White Cycle Puzzle");
-    /** 保存 private。 */
+    /** 棋盘显示与交互面板。 */
     private final BoardPanel boardPanel = new BoardPanel();
-    /** 保存 private。 */
+    /** 底部状态提示标签。 */
     private final JLabel statusLabel = new JLabel(" ");
-    /** 保存 private。 */
+    /** 显示或隐藏标准答案的按钮。 */
     private final JToggleButton answerButton = new JToggleButton("显示答案");
-    /** 保存 private。 */
+    /** 随机生成棋盘的按钮。 */
     private final JButton generateButton = new JButton("随机生成");
-    /** 保存 private。 */
+    /** 提交玩家答案的按钮。 */
     private final JButton submitButton = new JButton("提交");
-    /** 保存 private。 */
+    /** 撤销玩家路径的按钮。 */
     private final JButton undoButton = new JButton("←");
-    /** 保存 private。 */
+    /** 重做玩家路径的按钮。 */
     private final JButton redoButton = new JButton("→");
-    /** 保存 private。 */
+    /** 保存棋盘的按钮。 */
     private final JButton saveButton = new JButton("保存棋盘");
-    /** 保存 private。 */
+    /** 难度选择下拉框。 */
     private final JComboBox<BoardGenerator.Difficulty> difficultyBox =
         new JComboBox<>(BoardGenerator.Difficulty.values());
-    /** 保存 private。 */
+    /** 当前棋盘。 */
     private Board board;
-    /** 保存 private。 */
+    /** 窗口显示后是否自动生成棋盘。 */
     private boolean autoGenerateOnShow;
-    /** 保存 private。 */
+    /** 当前棋盘的求解结果。 */
     private CycleSolver.Result currentResult = new CycleSolver.Result(0, false, List.of(), 0);
 
     /**
@@ -75,7 +73,11 @@ public final class PuzzleApp {
         });
     }
 
-    /** 执行 runCliCheck 相关逻辑。 */
+    /**
+     * 执行命令行唯一解检查。
+     *
+     * @param args 命令行参数。
+     */
     private static void runCliCheck(String[] args) {
         if (args.length < 2) {
             System.err.println("Usage: java -cp out puzzle.PuzzleApp --check board.txt");
@@ -95,7 +97,11 @@ public final class PuzzleApp {
         }
     }
 
-    /** 执行 runCliGenerate 相关逻辑。 */
+    /**
+     * 执行命令行棋盘生成。
+     *
+     * @param args 命令行参数。
+     */
     private static void runCliGenerate(String[] args) {
         BoardGenerator.Difficulty difficulty = args.length >= 2
             ? BoardGenerator.Difficulty.fromText(args[1])
@@ -114,7 +120,12 @@ public final class PuzzleApp {
         }
     }
 
-    /** 执行 loadInitialBoard 相关逻辑。 */
+    /**
+     * 从命令行参数加载初始棋盘。
+     *
+     * @param args 命令行参数。
+     * @return loadInitialBoard 的计算结果。
+     */
     private static Board loadInitialBoard(String[] args) {
         if (args.length == 0) {
             return null;
@@ -132,7 +143,11 @@ public final class PuzzleApp {
         }
     }
 
-    /** 创建 PuzzleApp 实例。 */
+    /**
+     * 创建 PuzzleApp 实例。
+     *
+     * @param initialBoard initialBoard 参数。
+     */
     private PuzzleApp(Board initialBoard) {
         configureFrame();
         boardPanel.setPathChangeListener(this::updatePlayerControls);
@@ -144,7 +159,7 @@ public final class PuzzleApp {
         }
     }
 
-    /** 执行 configureFrame 相关逻辑。 */
+    /** 配置主窗口布局和关闭行为。 */
     private void configureFrame() {
         frame.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
         frame.setLayout(new BorderLayout());
@@ -155,7 +170,11 @@ public final class PuzzleApp {
         frame.setLocationRelativeTo(null);
     }
 
-    /** 执行 createToolbar 相关逻辑。 */
+    /**
+     * 创建顶部工具栏。
+     *
+     * @return 顶部工具栏。
+     */
     private JPanel createToolbar() {
         JButton openButton = new JButton("加载棋盘");
 
@@ -193,7 +212,7 @@ public final class PuzzleApp {
         return toolbar;
     }
 
-    /** 执行 show 相关逻辑。 */
+    /** 显示主窗口。 */
     private void show() {
         frame.setVisible(true);
         if (autoGenerateOnShow) {
@@ -202,7 +221,7 @@ public final class PuzzleApp {
         }
     }
 
-    /** 执行 showEmptyBoard 相关逻辑。 */
+    /** 显示等待自动生成的空棋盘状态。 */
     private void showEmptyBoard() {
         board = null;
         currentResult = new CycleSolver.Result(0, false, List.of(), 0);
@@ -219,7 +238,7 @@ public final class PuzzleApp {
         statusLabel.setText("正在准备自动生成棋盘...");
     }
 
-    /** 执行 openBoardFile 相关逻辑。 */
+    /** 打开文件选择器并加载棋盘。 */
     private void openBoardFile() {
         JFileChooser chooser = new JFileChooser();
         chooser.setFileFilter(new FileNameExtensionFilter("Text board files", "txt", "board"));
@@ -236,7 +255,7 @@ public final class PuzzleApp {
         }
     }
 
-    /** 执行 saveBoardFile 相关逻辑。 */
+    /** 保存当前棋盘到文件。 */
     private void saveBoardFile() {
         if (board == null) {
             JOptionPane.showMessageDialog(frame, "当前没有可保存的棋盘", "保存失败", JOptionPane.WARNING_MESSAGE);
@@ -271,7 +290,12 @@ public final class PuzzleApp {
         }
     }
 
-    /** 执行 withDefaultTxtExtension 相关逻辑。 */
+    /**
+     * 为没有扩展名的保存路径补充 txt 扩展名。
+     *
+     * @param path 文件路径或格子路径。
+     * @return 补全扩展名后的路径。
+     */
     private Path withDefaultTxtExtension(Path path) {
         String fileName = path.getFileName().toString();
         if (fileName.contains(".")) {
@@ -280,7 +304,7 @@ public final class PuzzleApp {
         return path.resolveSibling(fileName + ".txt");
     }
 
-    /** 执行 generateRandomBoard 相关逻辑。 */
+    /** 异步生成随机棋盘。 */
     private void generateRandomBoard() {
         BoardGenerator.Difficulty difficulty = selectedDifficulty();
         answerButton.setSelected(false);
@@ -296,13 +320,17 @@ public final class PuzzleApp {
         statusLabel.setText("正在随机生成" + difficulty.label() + "难度唯一解棋盘...");
 
         SwingWorker<BoardGenerator.Generated, Void> worker = new SwingWorker<>() {
-            /** 执行 doInBackground 相关逻辑。 */
+            /**
+             * 在后台线程执行耗时任务。
+             *
+             * @return doInBackground 的计算结果。
+             */
             @Override
             protected BoardGenerator.Generated doInBackground() {
                 return BoardGenerator.generate(difficulty);
             }
 
-            /** 执行 done 相关逻辑。 */
+            /** 在后台任务完成后更新界面状态。 */
             @Override
             protected void done() {
                 generateButton.setEnabled(true);
@@ -336,7 +364,11 @@ public final class PuzzleApp {
         worker.execute();
     }
 
-    /** 执行 selectedDifficulty 相关逻辑。 */
+    /**
+     * 读取当前界面选择的生成难度。
+     *
+     * @return 当前选择的生成难度。
+     */
     private BoardGenerator.Difficulty selectedDifficulty() {
         Object selected = difficultyBox.getSelectedItem();
         if (selected instanceof BoardGenerator.Difficulty difficulty) {
@@ -345,7 +377,11 @@ public final class PuzzleApp {
         return BoardGenerator.Difficulty.EASY;
     }
 
-    /** 执行 loadBoard 相关逻辑。 */
+    /**
+     * 加载棋盘并异步求解。
+     *
+     * @param newBoard 待加载的新棋盘。
+     */
     private void loadBoard(Board newBoard) {
         generateButton.setEnabled(true);
         difficultyBox.setEnabled(true);
@@ -361,13 +397,17 @@ public final class PuzzleApp {
         boardPanel.setOverlayText("正在求解");
 
         SwingWorker<CycleSolver.Result, Void> worker = new SwingWorker<>() {
-            /** 执行 doInBackground 相关逻辑。 */
+            /**
+             * 在后台线程执行耗时任务。
+             *
+             * @return doInBackground 的计算结果。
+             */
             @Override
             protected CycleSolver.Result doInBackground() {
                 return CycleSolver.solve(board, SOLVER_NODE_LIMIT);
             }
 
-            /** 执行 done 相关逻辑。 */
+            /** 在后台任务完成后更新界面状态。 */
             @Override
             protected void done() {
                 try {
@@ -384,7 +424,7 @@ public final class PuzzleApp {
         worker.execute();
     }
 
-    /** 执行 submitAnswer 相关逻辑。 */
+    /** 提交并检查玩家答案。 */
     private void submitAnswer() {
         if (board == null || currentResult.path().isEmpty()) {
             JOptionPane.showMessageDialog(frame, "当前没有可提交的标准答案", "提交失败", JOptionPane.WARNING_MESSAGE);
@@ -405,7 +445,7 @@ public final class PuzzleApp {
         }
     }
 
-    /** 执行 updatePlayerControls 相关逻辑。 */
+    /** 根据玩家路径状态刷新作答按钮。 */
     private void updatePlayerControls() {
         boolean hasBoard = board != null;
         boolean hasAnswer = hasBoard && !currentResult.path().isEmpty();
@@ -414,7 +454,7 @@ public final class PuzzleApp {
         submitButton.setEnabled(hasAnswer && boardPanel.isPlayerPathClosed());
     }
 
-    /** 执行 updateAfterSolve 相关逻辑。 */
+    /** 根据求解结果刷新界面。 */
     private void updateAfterSolve() {
         boardPanel.setOverlayText("");
         boardPanel.setSolutionPath(currentResult.path());

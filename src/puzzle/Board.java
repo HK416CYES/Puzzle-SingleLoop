@@ -3,19 +3,22 @@ package puzzle;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * 表示不可变的黑白棋盘。
- * 白格用 {@code true} 保存，黑格用 {@code false} 保存。
- */
+/** { 对应的内部状态。 */
 public final class Board {
-    /** 保存 private。 */
+    /** 棋盘行数。 */
     private final int rows;
-    /** 保存 private。 */
+    /** 棋盘列数。 */
     private final int cols;
-    /** 保存 private。 */
+    /** 按行优先保存白格状态。 */
     private final boolean[] white;
 
-    /** 创建 Board 实例。 */
+    /**
+     * 创建 Board 实例。
+     *
+     * @param rows 棋盘行数。
+     * @param cols 棋盘列数。
+     * @param white 白格标记数组。
+     */
     private Board(int rows, int cols, boolean[] white) {
         this.rows = rows;
         this.cols = cols;
@@ -114,7 +117,14 @@ public final class Board {
         return lines;
     }
 
-    /** 执行 index 相关逻辑。 */
+    /**
+     * 将行列坐标转换为一维数组下标。
+     *
+     * @param cols 棋盘列数。
+     * @param row 行号。
+     * @param col 列号。
+     * @return 一维数组下标。
+     */
     private static int index(int cols, int row, int col) {
         return row * cols + col;
     }

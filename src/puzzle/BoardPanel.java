@@ -14,36 +14,34 @@ import java.awt.event.MouseEvent;
 import java.awt.geom.Line2D;
 import java.util.List;
 
-/**
- * 显示棋盘并处理玩家鼠标拖动路径的 Swing 面板。
- */
+/** { 对应的内部状态。 */
 public final class BoardPanel extends JPanel {
-    /** 保存 private。 */
+    /** 棋盘绘制区域外边距。 */
     private static final int PADDING = 22;
-    /** 保存 private。 */
+    /** 面板背景色。 */
     private static final Color BACKGROUND = new Color(0xf4f6f8);
-    /** 保存 private。 */
+    /** 黑格填充色。 */
     private static final Color BLACK_CELL = new Color(0x20252b);
-    /** 保存 private。 */
+    /** 白格填充色。 */
     private static final Color WHITE_CELL = new Color(0xfafafa);
-    /** 保存 private。 */
+    /** 棋盘网格线颜色。 */
     private static final Color GRID_LINE = new Color(0xcfd6de);
-    /** 保存 private。 */
+    /** 标准答案线颜色。 */
     private static final Color ANSWER_LINE = new Color(24, 169, 87, 130);
-    /** 保存 private。 */
+    /** 玩家路径线颜色。 */
     private static final Color PLAYER_LINE = new Color(0x18a957);
 
-    /** 保存 private。 */
+    /** 当前棋盘。 */
     private Board board = Board.empty(10, 10);
-    /** 保存 private。 */
+    /** 玩家当前作答路径。 */
     private PlayerPath playerPath = new PlayerPath(board);
-    /** 保存 private。 */
+    /** 标准答案路径。 */
     private List<Integer> solutionPath = List.of();
-    /** 保存 private。 */
+    /** 是否显示标准答案。 */
     private boolean showAnswer;
-    /** 保存 private。 */
+    /** 棋盘中央覆盖提示文本。 */
     private String overlayText = "";
-    /** 保存 private。 */
+    /** 玩家路径变化回调。 */
     private Runnable pathChangeListener = () -> { };
 
     /** 创建 BoardPanel 实例。 */
@@ -51,13 +49,21 @@ public final class BoardPanel extends JPanel {
         setBackground(BACKGROUND);
         setPreferredSize(new Dimension(640, 640));
         MouseAdapter mouseAdapter = new MouseAdapter() {
-            /** 执行 mousePressed 相关逻辑。 */
+            /**
+             * 处理鼠标按下事件。
+             *
+             * @param event 鼠标事件。
+             */
             @Override
             public void mousePressed(MouseEvent event) {
                 startPlayerPath(event);
             }
 
-            /** 执行 mouseDragged 相关逻辑。 */
+            /**
+             * 处理鼠标拖动事件。
+             *
+             * @param event 鼠标事件。
+             */
             @Override
             public void mouseDragged(MouseEvent event) {
                 appendPlayerPath(event);
@@ -194,7 +200,11 @@ public final class BoardPanel extends JPanel {
         return playerPath.cells();
     }
 
-    /** 执行 paintComponent 相关逻辑。 */
+    /**
+     * 绘制棋盘、答案和玩家路径。
+     *
+     * @param graphics 绘图上下文。
+     */
     @Override
     protected void paintComponent(Graphics graphics) {
         super.paintComponent(graphics);
@@ -218,7 +228,11 @@ public final class BoardPanel extends JPanel {
         g.dispose();
     }
 
-    /** 执行 startPlayerPath 相关逻辑。 */
+    /**
+     * 根据鼠标位置开始新的玩家路径。
+     *
+     * @param event 鼠标事件。
+     */
     private void startPlayerPath(MouseEvent event) {
         int cell = cellAt(event.getPoint());
         if (cell == -1 || !board.isWhite(board.rowOf(cell), board.colOf(cell))) {
@@ -233,7 +247,11 @@ public final class BoardPanel extends JPanel {
         repaint();
     }
 
-    /** 执行 appendPlayerPath 相关逻辑。 */
+    /**
+     * 根据鼠标拖动位置追加玩家路径。
+     *
+     * @param event 鼠标事件。
+     */
     private void appendPlayerPath(MouseEvent event) {
         int cell = cellAt(event.getPoint());
         if (cell == -1) {
@@ -245,7 +263,12 @@ public final class BoardPanel extends JPanel {
         }
     }
 
-    /** 执行 cellAt 相关逻辑。 */
+    /**
+     * 将面板坐标转换为棋盘格子编号。
+     *
+     * @param point 面板坐标点。
+     * @return 格子编号；如果坐标不在棋盘内则返回 -1。
+     */
     private int cellAt(Point point) {
         Layout layout = computeLayout();
         if (point.x < layout.x || point.y < layout.y
@@ -260,12 +283,16 @@ public final class BoardPanel extends JPanel {
         return board.cellIndex(row, col);
     }
 
-    /** 执行 notifyPathChanged 相关逻辑。 */
+    /** 通知监听器玩家路径已经变化。 */
     private void notifyPathChanged() {
         pathChangeListener.run();
     }
 
-    /** 执行 computeLayout 相关逻辑。 */
+    /**
+     * 计算棋盘在面板中的绘制布局。
+     *
+     * @return 棋盘绘制布局。
+     */
     private Layout computeLayout() {
         int availableWidth = Math.max(1, getWidth() - PADDING * 2);
         int availableHeight = Math.max(1, getHeight() - PADDING * 2);
@@ -277,7 +304,12 @@ public final class BoardPanel extends JPanel {
         return new Layout(x, y, cell, boardWidth, boardHeight);
     }
 
-    /** 执行 drawCells 相关逻辑。 */
+    /**
+     * 绘制黑白格和网格线。
+     *
+     * @param g 二维绘图上下文。
+     * @param layout 棋盘绘制布局。
+     */
     private void drawCells(Graphics2D g, Layout layout) {
         for (int r = 0; r < board.rows(); r++) {
             for (int c = 0; c < board.cols(); c++) {
@@ -300,7 +332,16 @@ public final class BoardPanel extends JPanel {
         }
     }
 
-    /** 执行 drawPath 相关逻辑。 */
+    /**
+     * 绘制一条由格子中心连接成的路径。
+     *
+     * @param g 二维绘图上下文。
+     * @param layout 棋盘绘制布局。
+     * @param path 文件路径或格子路径。
+     * @param closed 路径是否闭环。
+     * @param color 路径颜色。
+     * @param strokeWidth 线条宽度。
+     */
     private void drawPath(Graphics2D g, Layout layout, List<Integer> path, boolean closed, Color color, float strokeWidth) {
         if (path.size() < 2) {
             return;
@@ -316,14 +357,27 @@ public final class BoardPanel extends JPanel {
         }
     }
 
-    /** 执行 drawSegment 相关逻辑。 */
+    /**
+     * 绘制两个格子中心之间的线段。
+     *
+     * @param g 二维绘图上下文。
+     * @param layout 棋盘绘制布局。
+     * @param a 第一个格子或顶点。
+     * @param b 第二个格子或顶点。
+     */
     private void drawSegment(Graphics2D g, Layout layout, int a, int b) {
         Point p1 = centerOf(a, layout);
         Point p2 = centerOf(b, layout);
         g.draw(new Line2D.Double(p1.x, p1.y, p2.x, p2.y));
     }
 
-    /** 执行 centerOf 相关逻辑。 */
+    /**
+     * 计算格子中心点坐标。
+     *
+     * @param cell 格子编号。
+     * @param layout 棋盘绘制布局。
+     * @return 格子中心点。
+     */
     private Point centerOf(int cell, Layout layout) {
         int row = board.rowOf(cell);
         int col = board.colOf(cell);
@@ -332,7 +386,12 @@ public final class BoardPanel extends JPanel {
         return new Point(x, y);
     }
 
-    /** 执行 drawOverlay 相关逻辑。 */
+    /**
+     * 绘制棋盘中央覆盖提示。
+     *
+     * @param g 二维绘图上下文。
+     * @param layout 棋盘绘制布局。
+     */
     private void drawOverlay(Graphics2D g, Layout layout) {
         FontMetrics metrics = g.getFontMetrics();
         int textWidth = metrics.stringWidth(overlayText);
@@ -348,7 +407,15 @@ public final class BoardPanel extends JPanel {
         g.drawString(overlayText, x + 14, y + 12 + metrics.getAscent());
     }
 
-    /** 表示 Layout 记录。 */
+    /**
+     * 保存棋盘绘制区域的位置和尺寸。
+     *
+     * @param x x 参数。
+     * @param y y 参数。
+     * @param cell 格子编号。
+     * @param boardWidth boardWidth 参数。
+     * @param boardHeight boardHeight 参数。
+     */
     private record Layout(int x, int y, int cell, int boardWidth, int boardHeight) {
     }
 }
